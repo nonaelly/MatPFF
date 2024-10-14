@@ -1,14 +1,15 @@
-function [K, B, D] = globalK2D(Para, elem, GaussInfo)
+function [K, B, D] = globalK2DV2(Para, elem, GaussInfo)
 isStress = Para.isStress;  % 1 - plane stress, 2 - plane strain
 E = Para.E; % Young's Modulus based on (N/mm2)
 nu = Para.nu; % Poisson's Ratio
+lamda = Para.lambda; % Lame Constant
+mu = Para.mu; % Lame Constant
 
-if isStress == 1  % plane stress
-    D = E/(1-nu^2)*[1,nu,0;nu,1,0;0,0,(1-nu)/2];
-else  % plane strain
-    D = E*(1-nu)/((1+nu)*(1-2*nu))*[1,nu/(1-nu),0;nu/(1-nu),1,0;0,0,(1-2*nu)/(2*(1-nu))];
-end
-
+D = [lamda+2*mu, lamda, lamda, 0;
+    lamda, lamda+2*mu, lamda, 0;
+    lamda, lamda, lamda+2*mu, 0;
+    0, 0, 0, mu;
+    ];
 numEleNd  = size(elem, 2);  % num of ele nodes
 numEle = size(elem, 1); % num of ele
 numEDofs = numEleNd * Para.ndim;
@@ -27,12 +28,9 @@ for ei = 1 : numEle
 
     dRdx_0 = GaussInfo.EleShapeDerivBar{ei};
     R0 = GaussInfo.EleShapeValBar{ei};
-    BBarDev = zeros(3, 2 * numEleNd);
-    BBarDev(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(1, :); dRdx_0(1, :)];
-    BBarDev(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(2, :); dRdx_0(2, :)];
-
-    %     BBarDev(1:2, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(1, :); dRdx_0(1, :)];
-    %     BBarDev(1:2, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(2, :); dRdx_0(2, :)];
+    BBarDil = zeros(4, 2 * numEleNd);
+    BBarDil(1:3, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(1, :); dRdx_0(1, :); dRdx_0(1, :)];
+    BBarDil(1:3, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(2, :); dRdx_0(2, :); dRdx_0(2, :)];
 
     for gpti = 1 : size(dRdxGaussPt,3)
 
@@ -46,25 +44,21 @@ for ei = 1 : numEle
         % %     | N_{1, y} N_{1, x}  ... N_{m, y} N_{m, x}  ...|
         % %      -                                             -
         % % \sigma = [\sigma_{xx} \sigma_{yy} \sigma_{xy}]
-        B = zeros(3, 2 * numEleNd);
-        BDev = zeros(3, 2 * numEleNd);
+        B = zeros(4, 2 * numEleNd);
         B(1, 1 : 2 : 2 * numEleNd) = dRdx(1, :);
         B(2, 2 : 2 : 2 * numEleNd) = dRdx(2, :);
+        B(4, 1 : 2 : 2 * numEleNd) = dRdx(2, :);
+        B(4, 2 : 2 : 2 * numEleNd) = dRdx(1, :);
 
-        B(3, 1 : 2 : 2 * numEleNd) = dRdx(2, :);
-        B(3, 2 : 2 : 2 * numEleNd) = dRdx(1, :);
+        BDil = zeros(4, 2 * numEleNd);
+        BDil(1:3, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx(1, :); dRdx(1, :); dRdx(1, :)];
+        BDil(1:3, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx(2, :); dRdx(2, :); dRdx(2, :)];
 
-        BDev(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * [dRdx(1, :); dRdx(1, :)];
-        BDev(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * [dRdx(2, :); dRdx(2, :)];
-
-        %         BDev(1:2, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx(1, :); dRdx(1, :)];
-        %         BDev(1:2, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx(2, :); dRdx(2, :)];
-
-        BBar = B - BDev + BBarDev;
+        BBar = B - BDil + BBarDil;
 
         % compute element stiffness at quadrature point
         % h = 1
-%                 Ke = Ke + B' * D * B * JW(gpti) * 1;
+        %                 Ke = Ke + B' * D * B * JW(gpti) * 1;
         Ke = Ke + BBar' * D * BBar * JW(gpti) * 1;
 
     end

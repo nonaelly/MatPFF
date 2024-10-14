@@ -7,8 +7,10 @@ addpath("Func\")
 R1 = 5;
 R2 = 10;
 O = [0,0];
-numR = 4;
-numTheta = 5;
+% numR = 4;
+% numTheta = 5;
+numR = 1;
+numTheta = 1;
 [node, elem, nodeBou, elemBou] = generateMeshFEM('cyl', R1, R2, O, numR, numTheta);
 sumNode = size(node,1);
 
@@ -16,8 +18,8 @@ sumNode = size(node,1);
 % Para.PFModel = 2; % 1-AT2; 2-AT1
 Para.ndim = 2; % dim
 Para.isStress = 2;  % 1 - plane stress, 2 - plane strain
-Para.E = 25714; % Young's Modulus based on (N/mm2)
-Para.nu = 0.2857; % Poisson's Ratio
+Para.E = 1; % Young's Modulus based on (N/mm2)
+Para.nu = 0.3; % Poisson's Ratio
 Para.lambda = Para.E*Para.nu/((1+Para.nu)*(1-2*Para.nu)); % Lame Constant
 Para.mu = Para.E/(2*(1+Para.nu)); % Lame Constant
 % Para.Gc = 0.089; % Critical energy release for unstable crack (Gc, N/mm)
@@ -30,6 +32,8 @@ node(:,1)   = [];
 node = node(:, 1 : Para.ndim);
 
 [GaussInfo] = shapeFunc_valueDeriv(elem, node, Para);
+% K = globalK2DV2(Para, elem, GaussInfo);
+
 K = globalK2D(Para, elem, GaussInfo);
 
 %% Elastic problem
