@@ -23,6 +23,7 @@ JW = cell(numEle, 1);             % Ele: det(Jacobian) * weight at GPts
 Hisy = cell(numEle, 1);           % Ele: reference energy at GPts
 EleShapeDerivBar = cell(numEle, 1);
 EleShapeValBar = cell(numEle, 1);
+% JA = cell(numEle, 1);             % Ele: det(Jacobian) at GPts
 
 for ei = 1 : numEle
     Ndcoord = node(elem(ei,:),:);
@@ -30,6 +31,7 @@ for ei = 1 : numEle
     dRdxGaussPt = zeros(Dof, numEleNd, size(gp,1));
     RGaussPt = zeros(size(gp,1), numEleNd);
     JacWeight = zeros(size(gp,1),1);
+    Jacob = zeros(size(gp,1),1);
 
     HisyGaussPt = zeros(size(gp,1),1); % predefine crack with nodal value, HisyGaussPt=0
 
@@ -51,7 +53,7 @@ for ei = 1 : numEle
         dRdxGaussPt( :, :, gpti) = dRdx; %
         RGaussPt(gpti, :) = R;           %
         JacWeight(gpti) = J * W;
-
+%         Jacob(gpti) = J;
     end
 
     %
@@ -62,6 +64,7 @@ for ei = 1 : numEle
     EleShapeVal{ei} = RGaussPt;
     JW{ei} = JacWeight;
     Hisy{ei} = HisyGaussPt; % all zeros
+%     JA{ei} = Jacob;
 end
 
 GaussInfo.SpDeriv = EleShapeDeriv;
@@ -71,5 +74,6 @@ GaussInfo.Hisy = Hisy;
 
 GaussInfo.EleShapeDerivBar = EleShapeDerivBar;
 GaussInfo.EleShapeValBar = EleShapeValBar;
+% GaussInfo.JA = JA;
 
 end

@@ -27,12 +27,24 @@ for ei = 1 : numEle
 
     dRdx_0 = GaussInfo.EleShapeDerivBar{ei};
     R0 = GaussInfo.EleShapeValBar{ei};
-    BBarDev = zeros(3, 2 * numEleNd);
-    BBarDev(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(1, :); dRdx_0(1, :)];
-    BBarDev(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(2, :); dRdx_0(2, :)];
+    BBarDil = zeros(3, 2 * numEleNd);
+    BBarDil(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(1, :); dRdx_0(1, :)];
+    BBarDil(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(2, :); dRdx_0(2, :)];
 
     %     BBarDev(1:2, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(1, :); dRdx_0(1, :)];
     %     BBarDev(1:2, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(2, :); dRdx_0(2, :)];
+
+    % BBar = ∫BdΩ/∫dΩ
+    inteB = zeros(2, numEleNd);
+    S = 0;
+    for gptj = 1 : size(dRdxGaussPt,3)
+        dRdx = dRdxGaussPt( :, :, gptj);
+        inteB = inteB + dRdx * JW(gptj) * 1;
+        S = S + JW(gptj) * 1;
+    end
+    BBarDil2 = zeros(3, 2 * numEleNd);
+    BBarDil2(1:2, 1 : 2 : 2 * numEleNd) = 1/2 /S * repmat(inteB(1, :), 2, 1);
+    BBarDil2(1:2, 2 : 2 : 2 * numEleNd) = 1/2 /S * repmat(inteB(2, :), 2, 1);
 
     for gpti = 1 : size(dRdxGaussPt,3)
 
@@ -47,24 +59,25 @@ for ei = 1 : numEle
         % %      -                                             -
         % % \sigma = [\sigma_{xx} \sigma_{yy} \sigma_{xy}]
         B = zeros(3, 2 * numEleNd);
-        BDev = zeros(3, 2 * numEleNd);
+        BDil = zeros(3, 2 * numEleNd);
         B(1, 1 : 2 : 2 * numEleNd) = dRdx(1, :);
         B(2, 2 : 2 : 2 * numEleNd) = dRdx(2, :);
 
         B(3, 1 : 2 : 2 * numEleNd) = dRdx(2, :);
         B(3, 2 : 2 : 2 * numEleNd) = dRdx(1, :);
 
-        BDev(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * [dRdx(1, :); dRdx(1, :)];
-        BDev(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * [dRdx(2, :); dRdx(2, :)];
+        BDil(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * repmat(dRdx(1, :), 2, 1);
+        BDil(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * repmat(dRdx(2, :), 2, 1);
 
         %         BDev(1:2, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx(1, :); dRdx(1, :)];
         %         BDev(1:2, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx(2, :); dRdx(2, :)];
 
-        BBar = B - BDev + BBarDev;
+%         BBar = B - BDil + BBarDil;
+        BBar = B - BDil + BBarDil2;
 
         % compute element stiffness at quadrature point
         % h = 1
-%                 Ke = Ke + B' * D * B * JW(gpti) * 1;
+        %                 Ke = Ke + B' * D * B * JW(gpti) * 1;
         Ke = Ke + BBar' * D * BBar * JW(gpti) * 1;
 
     end

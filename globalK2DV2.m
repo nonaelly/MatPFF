@@ -29,8 +29,21 @@ for ei = 1 : numEle
     dRdx_0 = GaussInfo.EleShapeDerivBar{ei};
     R0 = GaussInfo.EleShapeValBar{ei};
     BBarDil = zeros(4, 2 * numEleNd);
-    BBarDil(1:3, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(1, :); dRdx_0(1, :); dRdx_0(1, :)];
-    BBarDil(1:3, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(2, :); dRdx_0(2, :); dRdx_0(2, :)];
+    BBarDil(1:3, 1 : 2 : 2 * numEleNd) = 1/3 * repmat(dRdx_0(1, :), 3, 1);
+    BBarDil(1:3, 2 : 2 : 2 * numEleNd) = 1/3 * repmat(dRdx_0(2, :), 3, 1);
+
+    % BBar = ∫BdΩ/∫dΩ
+    inteB = zeros(2, numEleNd);
+    S = 0;
+    for gptj = 1 : size(dRdxGaussPt,3)
+        dRdx = dRdxGaussPt( :, :, gptj);
+        inteB = inteB + dRdx * JW(gptj) * 1;
+        S = S + JW(gptj) * 1;
+    end
+    BBarDil2 = zeros(4, 2 * numEleNd);
+    BBarDil2(1:3, 1 : 2 : 2 * numEleNd) = 1/3 /S * repmat(inteB(1, :), 3, 1);
+    BBarDil2(1:3, 2 : 2 : 2 * numEleNd) = 1/3 /S * repmat(inteB(2, :), 3, 1);
+
 
     for gpti = 1 : size(dRdxGaussPt,3)
 
@@ -51,14 +64,15 @@ for ei = 1 : numEle
         B(4, 2 : 2 : 2 * numEleNd) = dRdx(1, :);
 
         BDil = zeros(4, 2 * numEleNd);
-        BDil(1:3, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx(1, :); dRdx(1, :); dRdx(1, :)];
-        BDil(1:3, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx(2, :); dRdx(2, :); dRdx(2, :)];
+        BDil(1:3, 1 : 2 : 2 * numEleNd) = 1/3 * repmat(dRdx(1, :), 3, 1);
+        BDil(1:3, 2 : 2 : 2 * numEleNd) = 1/3 * repmat(dRdx(2, :), 3, 1);
 
-        BBar = B - BDil + BBarDil;
+%         BBar = B - BDil + BBarDil;
+        BBar = B - BDil + BBarDil2;
 
         % compute element stiffness at quadrature point
         % h = 1
-        %                 Ke = Ke + B' * D * B * JW(gpti) * 1;
+%         Ke = Ke + B' * D * B * JW(gpti) * 1;
         Ke = Ke + BBar' * D * BBar * JW(gpti) * 1;
 
     end
