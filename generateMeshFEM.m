@@ -40,18 +40,30 @@ switch geoType
                 elem(ind, :) = [ind, 1, ind1, ind2, ind3, ind4];
                 if j == 1 % line 3
                     elemBou{3} = [elemBou{3}; ind, 4];
-                elseif j == numR % line 1
+                end
+                if j == numR % line 1
                     elemBou{1} = [elemBou{1}; ind, 2];
                 end
                 if i == 1 % line 4
                     elemBou{4} = [elemBou{4}; ind, 1];
-                elseif i == numTheta % line 2
+                end
+                if i == numTheta % line 2
                     elemBou{2} = [elemBou{2}; ind, 3];
                 end
-
                 ind = ind + 1;
             end
         end
+        figure;
+        hold on;
+        for i = 1:size(elem, 1)
+            nodes = node(elem(i, 3:end), 2:3);
+            fill(nodes(:, 1), nodes(:, 2), 'w', 'EdgeColor', 'k');
+        end
+        plot(node(:, 2), node(:, 3), 'ro', 'MarkerFaceColor', 'r');
+        title('Mesh Plot');
+        xlabel('X');
+        ylabel('Y');
+        axis equal;
 
 end
 end

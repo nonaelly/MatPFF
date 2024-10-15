@@ -1,16 +1,16 @@
 % Elastic problem.
 % Thick cylinder
 
-clear; close all
+clear; close all; clc
 addpath("Func\")
 %%  ***  Reas Ansys Mesh  ***
 R1 = 5;
 R2 = 10;
 O = [0,0];
-% numR = 4;
-% numTheta = 5;
-numR = 1;
-numTheta = 1;
+numR = 5;
+numTheta = 4;
+% numR = 1;
+% numTheta = 1;
 [node, elem, nodeBou, elemBou] = generateMeshFEM('cyl', R1, R2, O, numR, numTheta);
 sumNode = size(node,1);
 
@@ -32,20 +32,39 @@ node(:,1)   = [];
 node = node(:, 1 : Para.ndim);
 
 [GaussInfo] = shapeFunc_valueDeriv(elem, node, Para);
-K = globalK2DV2(Para, elem, GaussInfo);
-
 K = globalK2D(Para, elem, GaussInfo);
 
 %% Elastic problem
 % Set boundary condition.
 boundary = {'p', 'dy', 'f', 'dx'};
-fixNode = generateBC(boundary, nodeBou);
+pressure = 1;
+[fixNode, nodeForce] = generateBC(boundary, nodeBou, elemBou, elem, node, pressure);
 
-BC = ElasSENT(fixNode, sumNode*2, 0);
+BC = setBC(fixNode, nodeForce, sumNode*2);
 
 % solve
-Disp = zeros(Para.NNd*Para.ndim,1);
-F = zeros(Para.NNd*Para.ndim,1);
-F(BC.FreeDOF) = F(BC.FreeDOF) - K(BC.FreeDOF, BC.DirchletDOF) * BC.Dirichlet;
-Disp(BC.FreeDOF) = K(BC.FreeDOF, BC.FreeDOF) \ F(BC.FreeDOF);
-Disp(BC.DirchletDOF) = BC.Dirichlet; % enforce BC 
+F = BC.RHS;
+% Big number
+max_abs_value = max(max(abs(K)));
+n = floor(log10(max_abs_value));
+bigN = 10^(9+n);
+for i = 1 : size(BC.DirchletDOF, 1)
+    ind = BC.DirchletDOF(i);
+    F(ind) = BC.Dirichlet(i) * K(ind, ind) * bigN;
+    K(ind, ind) = K(ind, ind) * bigN;
+end
+Disp = K\F;
+
+Disp = reshape(Disp,Para.ndim,[]);
+Disp = Disp';
+
+% ux
+figure
+axis equal;
+PlotContour(node,elem,Disp(:,1), 1);
+axis off;
+% uy
+figure
+axis equal;
+PlotContour(node,elem,Disp(:,2), 1);
+axis off;

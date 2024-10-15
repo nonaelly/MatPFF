@@ -1,4 +1,4 @@
-function [K, B, D] = globalK2D(Para, elem, GaussInfo)
+function K = globalK2D(Para, elem, GaussInfo)
 isStress = Para.isStress;  % 1 - plane stress, 2 - plane strain
 E = Para.E; % Young's Modulus based on (N/mm2)
 nu = Para.nu; % Poisson's Ratio
@@ -14,7 +14,6 @@ numEle = size(elem, 1); % num of ele
 numEDofs = numEleNd * Para.ndim;
 
 KVals = zeros(numEDofs^2, numEle); % store the stiff matrix
-BVals = zeros(numEDofs^2, numEle);
 
 for ei = 1 : numEle
     elei = elem(ei,:);
@@ -24,27 +23,24 @@ for ei = 1 : numEle
     dRdxGaussPt = GaussInfo.SpDeriv{ei};
     RGaussPt = GaussInfo.SpVal{ei};
     JW = GaussInfo.JW{ei};
-
+    
     dRdx_0 = GaussInfo.EleShapeDerivBar{ei};
     R0 = GaussInfo.EleShapeValBar{ei};
     BBarDil = zeros(3, 2 * numEleNd);
     BBarDil(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(1, :); dRdx_0(1, :)];
     BBarDil(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * [dRdx_0(2, :); dRdx_0(2, :)];
 
-    %     BBarDev(1:2, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(1, :); dRdx_0(1, :)];
-    %     BBarDev(1:2, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx_0(2, :); dRdx_0(2, :)];
-
-    % BBar = ∫BdΩ/∫dΩ
-    inteB = zeros(2, numEleNd);
-    S = 0;
-    for gptj = 1 : size(dRdxGaussPt,3)
-        dRdx = dRdxGaussPt( :, :, gptj);
-        inteB = inteB + dRdx * JW(gptj) * 1;
-        S = S + JW(gptj) * 1;
-    end
-    BBarDil2 = zeros(3, 2 * numEleNd);
-    BBarDil2(1:2, 1 : 2 : 2 * numEleNd) = 1/2 /S * repmat(inteB(1, :), 2, 1);
-    BBarDil2(1:2, 2 : 2 : 2 * numEleNd) = 1/2 /S * repmat(inteB(2, :), 2, 1);
+%     % BBar = ∫BdΩ/∫dΩ
+%     inteB = zeros(2, numEleNd);
+%     S = 0;
+%     for gptj = 1 : size(dRdxGaussPt,3)
+%         dRdx = dRdxGaussPt( :, :, gptj);
+%         inteB = inteB + dRdx * JW(gptj) * 1;
+%         S = S + JW(gptj) * 1;
+%     end
+%     BBarDil2 = zeros(3, 2 * numEleNd);
+%     BBarDil2(1:2, 1 : 2 : 2 * numEleNd) = 1/2 /S * repmat(inteB(1, :), 2, 1);
+%     BBarDil2(1:2, 2 : 2 : 2 * numEleNd) = 1/2 /S * repmat(inteB(2, :), 2, 1);
 
     for gpti = 1 : size(dRdxGaussPt,3)
 
@@ -69,21 +65,15 @@ for ei = 1 : numEle
         BDil(1:2, 1 : 2 : 2 * numEleNd) = 1/2 * repmat(dRdx(1, :), 2, 1);
         BDil(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * repmat(dRdx(2, :), 2, 1);
 
-        %         BDev(1:2, 1 : 2 : 2 * numEleNd) = 1/3 * [dRdx(1, :); dRdx(1, :)];
-        %         BDev(1:2, 2 : 2 : 2 * numEleNd) = 1/3 * [dRdx(2, :); dRdx(2, :)];
-
-%         BBar = B - BDil + BBarDil;
-        BBar = B - BDil + BBarDil2;
+        BBar = B - BDil + BBarDil;
+%         BBar = B - BDil + BBarDil2;
 
         % compute element stiffness at quadrature point
         % h = 1
         %                 Ke = Ke + B' * D * B * JW(gpti) * 1;
         Ke = Ke + BBar' * D * BBar * JW(gpti) * 1;
-
     end
     KVals(:, ei) = Ke(:);
-
-    %     BVals =
 end
 
 J = repmat(1:numEDofs, numEDofs, 1);
