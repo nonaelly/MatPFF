@@ -1,10 +1,10 @@
-function PlotContour(node,elem,value, isMesh)
+function PlotContour(node,elem,value, var, isMesh)
 % % show the contour
 % % ** code by P.M.H @bit.edu.cn (CN) **
 % %  Please feel free to contact us with any questions! 
 % %  - Email: pm_hu@outlook.com
 % %  ---------------------------------------
-if nargin < 4
+if nargin < 5
     isMesh = 0;
 end
 % figure
@@ -17,6 +17,6 @@ end
 colorbar
 % caxis([0 1])
 
-title({['max value: ',num2str(max(value))],['min value: ',num2str(min(value))]})
+title({var, ['max value: ',num2str(max(value))],['min value: ',num2str(min(value))]})
 
 end

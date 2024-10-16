@@ -7,8 +7,8 @@ addpath("Func\")
 R1 = 5;
 R2 = 10;
 O = [0,0];
-numR = 5;
-numTheta = 4;
+numR = 12;
+numTheta = 12;
 % numR = 1;
 % numTheta = 1;
 [node, elem, nodeBou, elemBou] = generateMeshFEM('cyl', R1, R2, O, numR, numTheta);
@@ -32,9 +32,11 @@ node(:,1)   = [];
 node = node(:, 1 : Para.ndim);
 
 [GaussInfo] = shapeFunc_valueDeriv(elem, node, Para);
-K = globalK2D(Para, elem, GaussInfo);
 
 %% Elastic problem
+
+K = globalK2D(Para, elem, GaussInfo);
+
 % Set boundary condition.
 boundary = {'p', 'dy', 'f', 'dx'};
 pressure = 1;
@@ -54,6 +56,7 @@ for i = 1 : size(BC.DirchletDOF, 1)
     K(ind, ind) = K(ind, ind) * bigN;
 end
 Disp = K\F;
+Stress = calcStress2DV2(GaussInfo, elem, Para, Disp);
 
 Disp = reshape(Disp,Para.ndim,[]);
 Disp = Disp';
@@ -61,10 +64,15 @@ Disp = Disp';
 % ux
 figure
 axis equal;
-PlotContour(node,elem,Disp(:,1), 1);
+PlotContour(node,elem,Disp(:,1),'ux',1);
 axis off;
 % uy
 figure
 axis equal;
-PlotContour(node,elem,Disp(:,2), 1);
+PlotContour(node,elem,Disp(:,2),'uy',1);
+axis off;
+% mises
+figure
+axis equal;
+PlotContour(node,elem,Stress.vonMises,'mises',1);
 axis off;
