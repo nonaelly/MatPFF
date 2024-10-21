@@ -4,60 +4,93 @@
 clear; close all; clc
 addpath("Func\")
 %%  ***  Reas Ansys Mesh  ***
-a = 1;
-b = 0;
-O = [0,0];
-numX = 1;
-numY = 1;
-% numR = 1;
-% numTheta = 1;
-[node, elem, nodeBou, elemBou] = generateMeshFEM('rect', a, b, O, numX, numY);
-sumNode = size(node,1);
+L = 1;
+a = L*[1, 1, 1];
+b = [0.5, 0.5, 0];
+O = [0,0; 0,0.5; 0,0.5];
+numX = 4*ones(3, 1);
+numY = [2, 2, 1];
+[node, elem, nodeBou, elemBou] = deal(cell(3, 1));
+sumNode = zeros(3, 1);
+for i = 1:3
+    [node{i}, elem{i}, nodeBou{i}, elemBou{i}] = generateMeshFEM('rect', a(i), b(i), O(i,:), numX(i), numY(i));
+    sumNode(i) = size(node{i},1);
+end
 
 %% ***  Material para  *** (Ambati's Paper)
-% Para.PFModel = 2; % 1-AT2; 2-AT1
-Para.ndim = 2; % dim
-Para.isStress = 2;  % 1 - plane stress, 2 - plane strain
-Para.E = 25714; % Young's Modulus based on (N/mm2)
-Para.nu = 0.2857; % Poisson's Ratio
-Para.lambda = Para.E*Para.nu/((1+Para.nu)*(1-2*Para.nu)); % Lame Constant
-Para.mu = Para.E/(2*(1+Para.nu)); % Lame Constant
-% Para.Gc = 0.089; % Critical energy release for unstable crack (Gc, N/mm)
-% Para.Len = 3; %
+E = [100, 200, 0];
+[Para, GaussInfo] = deal(cell(3, 1));
+for i = 1:3
+    Para{i}.ndim = 2; % dim
+    Para{i}.isStress = 2;  % 1 - plane stress, 2 - plane strain
+    Para{i}.E = E(i); % Young's Modulus based on (N/mm2)
+    Para{i}.nu = 0; % Poisson's Ratio
+    Para{i}.lambda = Para{i}.E*Para{i}.nu/((1+Para{i}.nu)*(1-2*Para{i}.nu)); % Lame Constant
+    Para{i}.mu = Para{i}.E/(2*(1+Para{i}.nu)); % Lame Constant
+    Para{i}.NNd = size(node{i},1); % number of nodes
 
-Para.NNd = size(node,1); % number of nodes
+    elem{i}(:,1:2) = [];
+    node{i}(:,1)   = [];
+    node{i} = node{i}(:, 1 : Para{i}.ndim);
+    if i == 3
+        u = zeros(size(node{i}));
+        [GaussInfo{i}] = shapeFunc_valueDeriv_CZM(elem{i}, node{i}, u, Para{i});
+    else
+        [GaussInfo{i}] = shapeFunc_valueDeriv(elem{i}, node{i}, Para{i});
+    end
 
-elem(:,1:2) = [];
-node(:,1)   = [];
-node = node(:, 1 : Para.ndim);
-u = zeros(size(node));
-[GaussInfo] = shapeFunc_valueDeriv_CZM(elem, node, u, Para);
-%% Cohesive zone model
+end
 
-sMax = 1;
-delta = 0.1;
-alphaP = 2;
-KCZM = globalK2D_CZM(Para, elem, GaussInfo, u, 1, sMax, delta, alphaP);
+%% Elastic problem with Cohesive zone model
+gc_I = 0.1;
+tu = 1;
+delatn = gc_I / (tu * exp(1));
+KCZM = globalK2D_CZM(Para{3}, elem{3}, GaussInfo{3}, u, 'exa', gc_I, delatn);
 
-%% Elastic problem
-K = globalK2D(Para, elem, GaussInfo);
+K = cell(2, 1);
+for i = 1 : 2
+    K{i} = globalK2D(Para{i}, elem{i}, GaussInfo{i});
+end
+
+% Assemble the total K.
+Ktotal = blkdiag(K{1}, K{2});
+nodeTotal = [node{1}; node{2}];
+idx =  size(K{1}, 1) - size(KCZM, 1)/2 + 1 : size(K{1}, 1) + size(KCZM, 1)/2;
+Ktotal(idx, idx) = Ktotal(idx, idx) + KCZM;
 
 % Set boundary condition.
-boundary = {'p', 'dx', 'dy', 'f'};
-pressure = 1;
-[fixNode, nodeForce] = generateBC(boundary, nodeBou, elemBou, elem, node, pressure);
+ubar = 1e-4;
+[fixNode, nodeForce] = generateBC_CZM(nodeBou, node, ubar);
 
-BC = setBC(fixNode, nodeForce, sumNode*2);
+BC = setBC(fixNode, nodeForce, sum(sumNode(1:2))*2);
 
 % solve
-Disp = solveBC(BC, K);
-Stress = calcStress2DV2(GaussInfo, elem, Para, Disp);
+Disp = solveBC(BC, Ktotal);
+% Stress = calcStress2DV2(GaussInfo, elem, Para, Disp);
 
-Disp = reshape(Disp,Para.ndim,[]);
+Disp = reshape(Disp,Para{1}.ndim,[]);
 Disp = Disp';
 
-r = b;
-uOut = (1+Para.nu)*pressure*a^2/Para.E/(b^2-a^2)*((1-2*Para.nu)*r + b^2/r);
+figure
+% x = 0
+idx_x0 = 1:numX(1)+1:size(nodeTotal, 1);
+vn = delatn;
+n = 10;
+y = zeros(n+1, 1);
+for i = 1 : n+1
+    y(i) = (i-1) / n * L;
+    if y(i) >= 1/2*L
+        DispAna(i) = ubar - ubar / ((L/2)*(1+E(2)/E(1)) + E(2)*(vn^2)/gc_I) * (L-y(i));
+    else
+        DispAna(i) = E(2) * ubar / ((L/2)*(E(1)+E(2)) + E(1)*E(2)*(vn^2)/gc_I) * y(i);
+    end
+end
+plot(nodeTotal(idx_x0, 2), Disp(idx_x0, 2));
+hold on
+plot(y, DispAna, 'o')
+
+figure
+plot(nodeTotal(idx_x0, 2), Disp(idx_x0, 1));
 
 %% Plot
 % ux
@@ -75,72 +108,3 @@ figure
 axis equal;
 PlotContour(node,elem,Stress.vonMises,'mises',1);
 axis off;
-
-%% Viscoelastic problem
-fprintf(1,'sort the global K1, K2 for vis\n')
-K1 = globalK2D(Para, elem, GaussInfo);
-[K2, K3] = globalKVis2D(Para, elem, GaussInfo);
-
-% Solve viscoelastic process
-
-t0=0;   % start time
-tEnd=300;  % total time
-dt=0.1; % time step
-
-E = Para.E; % elastic modulus
-nu = Para.nu; % poisson's ratio
-K0 = E/(3*(1-2*nu));
-G0 = E/(2*(1+nu));
-tauG = 1/2.3979;  % relaxation times
-tauK = 1/2.3979;  % relaxation times
-visG = 0.99; % nomalized shear modulus
-visK = 0;    % nomalized volume modulus
-
-[qG_jk, qG_jk1] = deal(zeros(numel(node), length(visG)));
-[qK_jk, qK_jk1] = deal(zeros(numel(node), length(visK)));
-[uk1, uk2, Fvis] = deal(zeros(numel(node), 1));
-uTest = zeros(numel(node), (tEnd-t0)/dt+1);
-t = t0;
-k = 1;
-while k <= (tEnd-t0)/dt+1
-    g_dt = (1 - visG.*(1-exp(-dt./tauG))) ;
-    k_dt = (1 - visK.*(1-exp(-dt./tauK)));
-
-    if k == 1
-        KA = K1;
-    else
-        KA = K1 + G0*(1 - g_dt)*K2 + K0*(1 - k_dt)*K3;
-        % u (k-1) = u (k)
-        uk2 = uk1;
-        uk1 = u;
-        % u* (k-2) = 1/2*(u (k-2) +  u (k-1))
-        uStar_k2 = (uk2 + uk1)/2;
-
-        % q_j,K(k) = exp(-dt/xi)*((1-exp(-dt/xi) * u* + q_j,K(k-1)))
-        qG_jk1 = qG_jk;
-        qK_jk1 = qK_jk;
-        if k > 2
-            qG_jk = exp(-dt./tauG).*((1-exp(-dt./tauG)).*uStar_k2+qG_jk1);
-            qK_jk = exp(-dt./tauK).*((1-exp(-dt./tauK)).*uStar_k2+qK_jk1);
-        end
-    end
-
-    feM1 = - 2*K2*(G0*sum(visG.*qG_jk, 2) + 1/2*G0*(1 - g_dt)*uk1);
-    feM2 = - K3*(K0*sum(visK.*qK_jk, 2) + 1/2*K0*(1 - k_dt)*uk1);
-    %     force = feT + feM + feM1 + feM2 + feM3;
-    Fvis = feM1 + feM2;
-
-    u = solveBC(BC, KA, Fvis);
-    uTest(:,k) = u;
-
-    t = t + dt;
-    k = k + 1;
-end
-
-uAna = CylinderAnalysis([0, b], a, b, -pressure, (1-visG)*G0, visG*G0, Para.nu, t0:dt:tEnd, tauG);
-
-figure
-n = 100;
-plot(t0:n*dt:tEnd, uAna(1:n:end, 2), 'bo')
-hold on
-plot(t0:dt:tEnd, uTest(2,:), 'r-')

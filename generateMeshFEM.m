@@ -82,7 +82,7 @@ switch geoType
                 ind = ind + 1;
             end
         end
-        node(2:3) = node(2:3) + O;
+        node(:, 2:3) = node(:, 2:3) + O;
 
         elem = zeros(numX * numY, 6);
         elemBou = cell(4, 1);
@@ -119,7 +119,7 @@ switch geoType
         nodeBou{4} = node(1:numX+1:end, :);
 
         % 绘制网格
-        figure;
+        figure(1);
         hold on;
         for i = 1:size(elem, 1)
             nodes = node(elem(i, 3:end), 2:3);

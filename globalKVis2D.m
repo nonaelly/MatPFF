@@ -69,6 +69,7 @@ for ei = 1 : numEle
         BDil(1:2, 2 : 2 : 2 * numEleNd) = 1/2 * repmat(dRdx(2, :), 2, 1);
 
         BBar = B - BDil + BBarDil;
+%         BBar = B;
         %         BBar = B - BDil + BBarDil2;
 
         % compute element stiffness at quadrature point

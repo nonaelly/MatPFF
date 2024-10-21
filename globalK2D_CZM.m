@@ -1,9 +1,4 @@
 function K = globalK2D_CZM(Para, elem, GaussInfo, u, czmType, varargin)
-isStress = Para.isStress;  % 1 - plane stress, 2 - plane strain
-E = Para.E; % Young's Modulus based on (N/mm2)
-nu = Para.nu; % Poisson's Ratio
-
-
 numEleNd  = size(elem, 2);  % num of ele nodes
 numEle = size(elem, 1); % num of ele
 numEDofs = numEleNd * Para.ndim;
@@ -13,7 +8,10 @@ switch czmType
         delta = varargin{2};
         alphaP = varargin{3};
         const1 = 27/4*sMax/delta;
-
+    case 'exa'
+        gc_I = varargin{1};
+        delatn = varargin{2};
+        const1 = gc_I/((delatn)^2);
 end
 
 KVals = zeros(numEDofs^2, numEle); % store the stiff matrix
@@ -59,9 +57,9 @@ for ei = 1 : numEle
 
         B = H * L * R;
 
-        DELTA = B * Ucoord;
-        dn = DELTA(2)/delta;
-        dt = DELTA(1)/delta;
+%         DELTA = B * Ucoord;
+%         dn = DELTA(2)/delta;
+%         dt = DELTA(1)/delta;
         switch czmType
             case 1
                 if dn<1
@@ -70,6 +68,11 @@ for ei = 1 : numEle
                 else
                     D = zeros(2);
                 end
+            case 'exa'
+                D = [0,0;
+                    0,const1];
+                D = [1,0;
+                    0,const1];
         end
         % compute element stiffness at quadrature point
         Ke = Ke + B' * D * B * JW(gpti);
