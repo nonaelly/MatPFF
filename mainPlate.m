@@ -9,7 +9,7 @@ a = L*[1, 1, 1];
 b = [0.5, 0.5, 0];
 O = [0,0; 0,0.5; 0,0.5];
 numX = 4*ones(3, 1);
-numY = [2, 2, 1];
+numY = [15, 15, 1];
 [node, elem, nodeBou, elemBou] = deal(cell(3, 1));
 sumNode = zeros(3, 1);
 for i = 1:3
@@ -75,7 +75,7 @@ figure
 % x = 0
 idx_x0 = 1:numX(1)+1:size(nodeTotal, 1);
 vn = delatn;
-n = 10;
+n = 20;
 y = zeros(n+1, 1);
 for i = 1 : n+1
     y(i) = (i-1) / n * L;
@@ -93,18 +93,11 @@ figure
 plot(nodeTotal(idx_x0, 2), Disp(idx_x0, 1));
 
 %% Plot
-% ux
-figure
-axis equal;
-PlotContour(node,elem,Disp(:,1),'ux',1);
-axis off;
 % uy
 figure
 axis equal;
-PlotContour(node,elem,Disp(:,2),'uy',1);
+PlotContour(node{1},elem{1},Disp(1:size(node{1}, 1), 2),'uy',1);
+hold on
+PlotContour(node{2},elem{2},Disp(end - size(node{2}, 1) + 1 : end, 2),'uy',1);
 axis off;
-% mises
-figure
-axis equal;
-PlotContour(node,elem,Stress.vonMises,'mises',1);
-axis off;
+
