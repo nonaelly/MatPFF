@@ -70,8 +70,8 @@ for ei = 1 : numEle
 
         % compute element stiffness at quadrature point
         % h = 1
-        Ke = Ke + B' * D * B * JW(gpti) * 1;
-%         Ke = Ke + BBar' * D * BBar * JW(gpti) * 1;
+%         Ke = Ke + B' * D * B * JW(gpti) * 1;
+        Ke = Ke + BBar' * D * BBar * JW(gpti) * 1;
     end
     KVals(:, ei) = Ke(:);
 end

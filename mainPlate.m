@@ -1,5 +1,6 @@
 % Elastic problem.
-% One cohesive element
+% two different elastic plate. 
+% Compared with an analytical solution.
 
 clear; close all; clc
 addpath("Func\")

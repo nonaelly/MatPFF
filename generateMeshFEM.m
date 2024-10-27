@@ -130,5 +130,125 @@ switch geoType
         xlabel('X');
         ylabel('Y');
         axis equal;
+    case 'SEB'
+        w = 100;
+        a = 19;
+        t = 75;
+        b1 = 162;
+        b2 = 26;
+        dx = varargin{1};
+        numY = varargin{2};
+        isC = varargin{3};
+
+        node = [];
+        ind = 1;
+        indX = 1;
+        x0 = 0;
+        x = x0;
+
+        if isC
+            for i = 1:2
+                for j = 1 : numY(2) + 1
+                    y = (w-a) * (j-1) / numY(2) + a;
+                    [node] = [node; ind, x, y];
+                    ind = ind + 1;
+                end
+            end
+            numX = 1;
+            elem = zeros(numX * numY(2), 6);
+        else
+            while x0 <= b1
+                for j = 1:numY(1)+1
+                    y = a * (j-1) / numY(1);
+                    [node] = [node; ind, x, y];
+                    ind = ind + 1;
+                end
+                for j = 1 : numY(2)
+                    y = (w-a) * j / numY(2) + a;
+                    [node] = [node; ind, x, y];
+                    ind = ind + 1;
+                end
+
+                x = x0 + dx;
+                x0 = x;
+
+                if x0 > b1 && x0 - dx < b1
+                    x = b1;
+                    x0 = x;
+                end
+
+                if indX == 5 && dx < 3
+                    dx = dx * 2;
+                    indX = 1;
+                else
+                    indX = indX + 1;
+                end
+            end
+            for i = 1:8
+                x = b1 + b2 * i / 8;
+                for j = 1:numY(1)+1
+                    y = a * (j-1) / numY(1);
+                    [node] = [node; ind, x, y];
+                    ind = ind + 1;
+                end
+                for j = 1 : numY(2)
+                    y = (w-a) * j / numY(2) + a;
+                    [node] = [node; ind, x, y];
+                    ind = ind + 1;
+                end
+            end
+            numX = size(node, 1)/(sum(numY) + 1) - 1;
+            elem = zeros(numX * sum(numY), 6);
+        end
+
+        elemBou = cell(4, 1);
+        ind = 1;
+
+        for i = 1:numX
+            for j = 1:sum(numY)
+                ind1 = j + (i-1)*(sum(numY)+1);
+                ind2 = ind1 + (sum(numY)+1);
+                ind3 = ind2 + 1;
+                ind4 = ind1 + 1;
+
+                if j == 1
+                    elemBou{1} = [elemBou{1}; ind, 1];
+                end
+                if i == numX
+                    elemBou{2} = [elemBou{2}; ind, 2];
+                end
+                if j == sum(numY)
+                    elemBou{3} = [elemBou{3}; ind, 3];
+                end
+                if i == 1 %
+                    elemBou{4} = [elemBou{4}; ind, 4];
+                end
+
+                %                 elem(ind, :) = [ind, 1, ind1, ind2, ind3, ind4];
+                elem(ind, :) = [ind, 1, ind2, ind3, ind4, ind1];
+                ind = ind + 1;
+            end
+        end
+
+        nodeBou = cell(4, 1);
+        nodeBou{1} = node(1:sum(numY)+1:end, :);
+        nodeBou{2} = node(end-sum(numY):end, :);
+        nodeBou{3} = node(sum(numY)+1:sum(numY)+1:end, :);
+        nodeBou{4} = node(1:sum(numY)+1, :);
+
+        % 绘制网格
+        figure(1);
+        hold on;
+        for i = 1:size(elem, 1)
+            nodes = node(elem(i, 3:end), 2:3);
+            fill(nodes(:, 1), nodes(:, 2), 'w', 'EdgeColor', 'k');
+        end
+        if isC
+            plot(node(:, 2), node(:, 3), 'ro', 'MarkerFaceColor', 'r');
+        end
+        title('single-edge notched beam (SE(B)) test');
+        xlabel('X');
+        ylabel('Y');
+        axis equal;
 end
 end
