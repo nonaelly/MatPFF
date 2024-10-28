@@ -236,7 +236,6 @@ switch geoType
         nodeBou{3} = node(sum(numY)+1:sum(numY)+1:end, :);
         nodeBou{4} = node(1:sum(numY)+1, :);
 
-        % 绘制网格
         figure(1);
         hold on;
         for i = 1:size(elem, 1)

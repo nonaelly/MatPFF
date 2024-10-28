@@ -59,6 +59,8 @@ nodeTotal = [node{1}; node{2}];
 idx =  size(K{1}, 1) - size(KCZM, 1)/2 + 1 : size(K{1}, 1) + size(KCZM, 1)/2;
 Ktotal(idx, idx) = Ktotal(idx, idx) + KCZM;
 
+Fc_0 = nodeForce_CZM(Para, elem, GaussInfo, u_c0, 'bilinear', sigma_c, lamda_cr, delta_c);
+
 % Set boundary condition.
 ubar = 1e-4;
 [fixNode, nodeForce] = generateBC_CZM(nodeBou, node, ubar);
