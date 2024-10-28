@@ -39,28 +39,46 @@ for i = 1:2
     node{i}(:,1)   = [];
     node{i} = node{i}(:, 1 : Para{i}.ndim);
     if i == 2
-        u = zeros(size(node{i}));
-        [GaussInfo{i}] = shapeFunc_valueDeriv_CZM(elem{i}, node{i}, u, Para{i});
+        u_0 = zeros(size(node{i}));
+        [GaussInfo{i}] = shapeFunc_valueDeriv_CZM(elem{i}, node{i}, u_0, Para{i});
     else
         [GaussInfo{i}] = shapeFunc_valueDeriv(elem{i}, node{i}, Para{i});
     end
-
 end
+
+K = globalK2D(Para{1}, elem{1}, GaussInfo{1});
 
 %% Elastic problem with Cohesive zone model
 sigma_c = 3.56; % MPa
 G_c = 344; % J*m^-2
 delta_c = 2*G_c/sigma_c*1e-3; % mm
 lamda_cr = 0.04;
-[KCZM, indIteration] = globalK2D_CZM_Bilinear(Para{2}, elem{2}, GaussInfo{2}, u, 'bilinear', sigma_c, lamda_cr, delta_c);
 
-K = globalK2D(Para{1}, elem{1}, GaussInfo{1});
+% Newton-Raphson method
+Tc_0 = zeros(numel(node{2}), 1);
+Fc_0 = nodeForce_CZM(Tc_0);
+R_0 = K * u_0 + Fc_0 - BC.RHS;
+KCZM_0 = globalK2D_CZM_Bilinear(Para{2}, elem{2}, GaussInfo{2}, u_0, 'bilinear', sigma_c, lamda_cr, delta_c);
+dRdu_0 = KCZM_0 + K;
+indIter = 0;
+while R_0 > tole && indIter<100
+du_0 = -dRdu_0\R_0;
+u_1 = u_0 + du_0;
+dTc_0 = Dc * Bc * du_0;
+Tc_1 = dTc_0 + Tc_0;
+Fc_1 = nodeForce_CZM(Tc_1);
+R_1 = K * u_1 + Fc_1 - BC.RHS;
+KCZM_1 = globalK2D_CZM_Bilinear(Para{2}, elem{2}, GaussInfo{2}, u_1, 'bilinear', sigma_c, lamda_cr, delta_c);
+dRdu_1 = KCZM_1 + K;
+du_1 = -dRdu_1\R_1;
+indIter = indIter + 1;
+end
 
 % Assemble the total K.
-Ktotal = zeros(size(K, 1) + size(KCZM, 1)/2);
+Ktotal = zeros(size(K, 1) + size(KCZM_0, 1)/2);
 
-idx =  [size(K, 1) + 1 : size(K, 1) + size(KCZM, 1)/2, 1 : size(KCZM, 1)/2];
-Ktotal(idx, idx) = Ktotal(idx, idx) + KCZM;
+idx =  [size(K, 1) + 1 : size(K, 1) + size(KCZM_0, 1)/2, 1 : size(KCZM_0, 1)/2];
+Ktotal(idx, idx) = Ktotal(idx, idx) + KCZM_0;
 idx =  1 : size(K, 1);
 Ktotal(idx, idx) = Ktotal(idx, idx) + K;
 

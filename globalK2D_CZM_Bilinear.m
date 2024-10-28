@@ -1,4 +1,4 @@
-function [K, indIteration] = globalK2D_CZM_Bilinear(Para, elem, GaussInfo, u, czmType, varargin)
+function K = globalK2D_CZM_Bilinear(Para, elem, GaussInfo, u, czmType, varargin)
 numEleNd  = size(elem, 2);  % num of ele nodes
 numEle = size(elem, 1); % num of ele
 numEDofs = numEleNd * Para.ndim;
@@ -7,7 +7,6 @@ if strcmp(czmType, 'bilinear')
     l_cr = varargin{2};
     d_c = varargin{3};
 end
-indIteration = 0;
 KVals = zeros(numEDofs^2, numEle); % store the stiff matrix
 
 for ei = 1 : numEle
@@ -61,7 +60,6 @@ for ei = 1 : numEle
             C_sn = 0;
             C_ns = 0;
         elseif l_e >= l_cr && l_e < 1
-            indIteration = 1;
             C_ss = - d_c*s_c/(1-l_cr)*((d_s/(l_e*d_c^2))^2)...
                 + (1-l_e)*(d_c*s_c)/(1-l_cr)*(1/(l_e*d_c^2)-1/(l_e^3)*(d_s^2/(d_c^4)));
             C_nn = - d_c*s_c/(1-l_cr)*((d_n/(l_e*d_c^2))^2)...
