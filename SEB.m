@@ -5,27 +5,11 @@
 clear; close all; clc
 addpath("Func\")
 %%  ***  Reas Ansys Mesh  ***
-w = 100;
-a = 19;
-t = 75;
-b1 = 162;
-b2 = 26;
-
-dx = 2;
-numY = [19, 81/1.5; 0, 81/1.5];
-% dx = 1;
-% numY = [19, 81/1; 0, 81/1];
-% dx = 10;
-% numY = [10, 3; 0, 3];
-[node, elem, nodeBou, elemBou] = deal(cell(2, 1));
-isC = [0, 1];
-sumNode = zeros(2, 1);
-for i = 1:2
-    [node{i}, elem{i}, nodeBou{i}, elemBou{i}] = generateMeshFEM('SEB', dx, numY(i, :), isC(i));
-    sumNode(i) = size(node{i},1);
-    node{i}(:,1)   = [];
-    elem{i}(:,1:2) = [];
-end
+% dx = 2;
+% numY = [19, 81/1.5];
+dx = 4;
+numY = [2, 3];
+[node, elem, nodeBou, elemBou] = generateMeshFEM_SEB(dx, numY);
 
 %% ***  Material para  *** (Ambati's Paper)
 E = [14.2e3, 0];

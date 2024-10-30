@@ -5,7 +5,8 @@ nodeForce = [];
 
 % (162, 0)
 m = find(ismember(node{1}, [162, 0], 'rows'));
-[fixNode] = [fixNode; m, 1, 0; m, 2, 0];
+% [fixNode] = [fixNode; m, 1, 0; m, 2, 0];
+[fixNode] = [fixNode; m, 2, 0];
 
 % (0, 100) P
 m = find(ismember(node{1}, [0, 100], 'rows'));

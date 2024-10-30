@@ -68,8 +68,8 @@ for ei = 1 : numEle
                 + (1-l_e)*(d_c*s_c)/(1-l_cr)*(-1/(l_e^3)*(d_s*d_n/(d_c^4)));
             C_ns = C_sn;
         else
-            C_ss = 0;
-            C_nn = 0;
+            C_ss = 1e-8;
+            C_nn = 1e-8;
             C_sn = 0;
             C_ns = 0;
         end
