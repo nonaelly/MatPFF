@@ -39,17 +39,27 @@ tole = 1e-6;
 numStep = 100;
 un = zeros(2*Para.NNd, numStep + 1);
 for n = 1 : numStep
-    % a starting value for the unknown must be chosen;
-    % usually the solution dn from the last time step (n) is selected
-    % step of the iteration: v = 0
-    uv = un(:, n);
+    % Boundary condition
     uP = n * 1e-3;
-    [KCZM, Fcv, BC, uBC, KBC, bigN] = newtonIteration(uv, uP, sigma_c, ...
-        lamda_cr, delta_c, elem, node, Para, nodeBou);
+
+    % A starting value for the unknown must be chosen;
+    % usually the solution u_n from the last time step (n) is selected 
+    % modify u_n to satisfy the boundary conditions.
+    
+    % Step of the iteration: v = 0
+    [BC, uv] = startingValue(un(:, n), uP);
+
+    % Calculate the cohesive nodal forces and the stiffness matrix
+    [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elem, node, Para);
+
     % Residual
-    Rv = K * uv + Fcv - BC.RHS + bigN * uBC;
+    Rv = K * uv + Fcv - BC.RHS;
     % Tanget matrix
-    dRduv = K + KCZM + bigN * KBC;
+    dRduv = K + KCZM;
+
+    % Modify Rv and dRduv to satisfy the boundary conditions.
+    [Rv, dRduv] = ApplyBC(BC, Rv, dRduv);
+
     idxIter = 0;
 
     while max(abs(Rv)) > tole && idxIter < 100
@@ -74,26 +84,28 @@ for n = 1 : numStep
 end
 
 %% Sub function
-function [KCZM, Fcv, BC, uBC, KBC, bigN] = newtonIteration(uv, uP, sigma_c, lamda_cr, delta_c, elem, node, Para, nodeBou)
-% Preparation for cohesive element
-elemCoh = elem(elem(:, 2) == 2, 3 : end);
+function [BC, uv] = startingValue(un, uP, nodeBou, node)
+uv = un;
 
 % Boundary condition
 [fixNode, nodeForce] = generateBC_CZM_BilinearV2(nodeBou, node(:, 2:3), uP);
 BC = setBC(fixNode, nodeForce, Para.NNd*2);
-uBC = zeros(Para.NNd*2, 1);
-KBC = sparse(BC.DirchletDOF, BC.DirchletDOF, 1, Para.NNd*2, Para.NNd*2);
 
-for i = 1 : size(BC.DirchletDOF, 1)
-    ind = BC.DirchletDOF(i);
-    uBC(ind) = uv(ind) - BC.Dirichlet(i);
+% uv should satisfy the boundary condition
+uv(BC.DirchletDOF) = BC.Dirchlet;
 end
+
+function [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elem, node, Para)
+% Preparation for cohesive element
+elemCoh = elem(elem(:, 2) == 2, 3 : end);
 
 uv = reshape(uv, 2, [])';
-GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv);
+GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv, Para);
 [KCZM, Fcv] = globalK2D_CZM_Bilinear(Para, elemCoh, GaussInfo, uv, 'bilinear', sigma_c, lamda_cr, delta_c);
-
-% Big number
-bigN = 10^(7+floor(log10(max(max(abs(KCZM))))));
-
 end
+
+function [Rv, dRduv] = ApplyBC(BC, Rv, dRduv)
+% Because Δu = - dRduv * Rv
+Rv(BC.DirchletDOF) = 0;
+
+end  
