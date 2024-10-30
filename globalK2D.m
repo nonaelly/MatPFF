@@ -2,6 +2,7 @@ function K = globalK2D(Para, elem, GaussInfo)
 isStress = Para.isStress;  % 1 - plane stress, 2 - plane strain
 E = Para.E; % Young's Modulus based on (N/mm2)
 nu = Para.nu; % Poisson's Ratio
+NNd = Para.NNd;
 
 if isStress == 1  % plane stress
     D = E/(1-nu^2)*[1,nu,0;nu,1,0;0,0,(1-nu)/2];
@@ -86,7 +87,7 @@ ElConn = ElConn';
 ii = ElConn(:, I(:))';
 jj = ElConn(:, J(:))';
 
-K = sparse(ii(:), jj(:), KVals(:));
+K = sparse(ii(:), jj(:), KVals(:), NNd * 2, NNd * 2);
 K = (K + K')/2;
 
 end

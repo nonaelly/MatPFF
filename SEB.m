@@ -5,10 +5,10 @@
 clear; close all; clc
 addpath("Func\")
 %%  ***  Reas Ansys Mesh  ***
-% dx = 2;
-% numY = [19, 81/1.5];
-dx = 4;
-numY = [2, 3];
+dx = 2;
+numY = [19, 81/1.5];
+% dx = 4;
+% numY = [2, 3];
 [node, elem, nodeBou, elemBou] = generateMeshFEM_SEB(dx, numY);
 
 %% ***  Material para  *** (Ambati's Paper)
@@ -36,13 +36,16 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-numStep = 10;
+numStep = 100;
 un = zeros(2*Para.NNd, numStep + 1);
 for n = 1 : numStep
     % a starting value for the unknown must be chosen;
     % usually the solution dn from the last time step (n) is selected
     % step of the iteration: v = 0
-    uv = un(n, :);
+    uv = un(:, n);
+    uP = n * 1e-3;
+    [KCZM, Fcv, BC, uBC, KBC, bigN] = newtonIteration(uv, uP, sigma_c, ...
+        lamda_cr, delta_c, elem, node, Para, nodeBou);
     % Residual
     Rv = K * uv + Fcv - BC.RHS + bigN * uBC;
     % Tanget matrix
@@ -52,9 +55,12 @@ for n = 1 : numStep
     while max(abs(Rv)) > tole && idxIter < 100
         % step of the iteration: v = 1, 2, ...
         duv = -dRduv\Rv;
-        
+
         % step of the iteration: v + 1, renew u, R, dRdu
         uv = uv + duv;
+        [KCZM, Fcv, BC, uBC, KBC, bigN] = newtonIteration(uv, uP, sigma_c, ...
+            lamda_cr, delta_c, elem, node, Para, nodeBou);
+
         % Residual
         Rv = K * uv + Fcv - BC.RHS + bigN * uBC;
         % Tanget matrix
@@ -63,7 +69,31 @@ for n = 1 : numStep
         idxIter = idxIter + 1;
     end
 
-    un(n + 1, :) = uv;
-    fprintf('Step %d', num2str(n), 'iteration number %d', num2str(idxIter))
+    un(:, n + 1) = uv;
+    fprintf('Step %d, iteration number %d\n', n, idxIter);
+end
+
+%% Sub function
+function [KCZM, Fcv, BC, uBC, KBC, bigN] = newtonIteration(uv, uP, sigma_c, lamda_cr, delta_c, elem, node, Para, nodeBou)
+% Preparation for cohesive element
+elemCoh = elem(elem(:, 2) == 2, 3 : end);
+
+% Boundary condition
+[fixNode, nodeForce] = generateBC_CZM_BilinearV2(nodeBou, node(:, 2:3), uP);
+BC = setBC(fixNode, nodeForce, Para.NNd*2);
+uBC = zeros(Para.NNd*2, 1);
+KBC = sparse(BC.DirchletDOF, BC.DirchletDOF, 1, Para.NNd*2, Para.NNd*2);
+
+for i = 1 : size(BC.DirchletDOF, 1)
+    ind = BC.DirchletDOF(i);
+    uBC(ind) = uv(ind) - BC.Dirichlet(i);
+end
+
+uv = reshape(uv, 2, [])';
+GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv);
+[KCZM, Fcv] = globalK2D_CZM_Bilinear(Para, elemCoh, GaussInfo, uv, 'bilinear', sigma_c, lamda_cr, delta_c);
+
+% Big number
+bigN = 10^(7+floor(log10(max(max(abs(KCZM))))));
 
 end

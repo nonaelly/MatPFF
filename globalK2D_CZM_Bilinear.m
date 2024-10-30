@@ -1,13 +1,16 @@
-function K = globalK2D_CZM_Bilinear(Para, elem, GaussInfo, u, czmType, varargin)
+function [K, F] = globalK2D_CZM_Bilinear(Para, elem, GaussInfo, u, czmType, varargin)
 numEleNd  = size(elem, 2);  % num of ele nodes
 numEle = size(elem, 1); % num of ele
-numEDofs = numEleNd * Para.ndim;
+ndim = 2;
+numEDofs = numEleNd * ndim;
+NNd = Para.NNd;
 if strcmp(czmType, 'bilinear')
     s_c = varargin{1};
     l_cr = varargin{2};
     d_c = varargin{3};
 end
 KVals = zeros(numEDofs^2, numEle); % store the stiff matrix
+FVals = zeros(numEDofs, numEle); % store the node force vector
 
 for ei = 1 : numEle
     elei = elem(ei,:);
@@ -15,6 +18,7 @@ for ei = 1 : numEle
     Ucoord = reshape(Ucoord', [], 1);
 
     Ke = zeros(numEDofs); % element stiff-u
+    Fe = zeros(numEDofs, 1); % element node force
 
     % loading FEM information
     dxdxi = GaussInfo.SpDerivPara{ei};
@@ -59,6 +63,9 @@ for ei = 1 : numEle
             C_nn = C_ss;
             C_sn = 0;
             C_ns = 0;
+            t_s = s_c / l_cr * (d_s / d_c);
+            t_n = s_c / l_cr * (d_n / d_c);
+            Tc = [t_s; t_n];
         elseif l_e >= l_cr && l_e < 1
             C_ss = - d_c*s_c/(1-l_cr)*((d_s/(l_e*d_c^2))^2)...
                 + (1-l_e)*(d_c*s_c)/(1-l_cr)*(1/(l_e*d_c^2)-1/(l_e^3)*(d_s^2/(d_c^4)));
@@ -67,18 +74,25 @@ for ei = 1 : numEle
             C_sn = - d_c*s_c/(1-l_cr)*(d_s/(l_e*d_c^2))*(d_n/(l_e*d_c^2))...
                 + (1-l_e)*(d_c*s_c)/(1-l_cr)*(-1/(l_e^3)*(d_s*d_n/(d_c^4)));
             C_ns = C_sn;
+            t_s = s_c * (1 - l_e) / (1 - l_cr) / l_e * (d_s / d_c);
+            t_n = s_c * (1 - l_e) / (1 - l_cr) / l_e * (d_n / d_c);
+            Tc = [t_s; t_n];
         else
             C_ss = 1e-8;
             C_nn = 1e-8;
             C_sn = 0;
             C_ns = 0;
+            Tc = zeros(2, 1);
         end
         D = [C_ss, C_sn;
             C_ns, C_nn];
         % compute element stiffness at quadrature point
         Ke = Ke + B' * D * B * JW(gpti);
+                Fe = Fe + B' * Tc * JW(gpti);
+
     end
     KVals(:, ei) = Ke(:);
+    FVals(:, ei) = Fe(:);
 end
 
 J = repmat(1:numEDofs, numEDofs, 1);
@@ -91,7 +105,18 @@ ElConn = ElConn';
 ii = ElConn(:, I(:))';
 jj = ElConn(:, J(:))';
 
-K = sparse(ii(:), jj(:), KVals(:));
+K = sparse(ii(:), jj(:), KVals(:), NNd * 2, NNd * 2);
 K = (K + K')/2;
+
+J = repmat(1:numEDofs, 1, 1);
+I = J';
+El = elem';
+Eldofs = [El(:)*2-1 El(:)*2]';
+ElConn = reshape(Eldofs(:), numEleNd*2, numEle);
+ElConn = ElConn';
+
+ii = ElConn(:, I(:))';
+
+F = sparse(ii(:), 1, FVals(:), NNd * 2, 1);
 
 end
