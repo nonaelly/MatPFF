@@ -126,19 +126,19 @@ for j = 1:numY(2)
     ind = ind + 1;
 end
 
-figure(1);
-hold on;
-for i = 1:size(elem, 1)
-    nodes = node(elem(i, 3:end), 2:3);
-    fill(nodes(:, 1), nodes(:, 2), 'w', 'EdgeColor', 'k');
-    if elem(i, 2) == 2 % CZM
-        plot(node(elem(i, 3:end), 2), node(elem(i, 3:end), 3), 'ro', 'MarkerFaceColor', 'r');
-    end
-end
-
-title('single-edge notched beam (SE(B)) test');
-xlabel('X');
-ylabel('Y');
-axis equal;
+% figure(1);
+% hold on;
+% for i = 1:size(elem, 1)
+%     nodes = node(elem(i, 3:end), 2:3);
+%     fill(nodes(:, 1), nodes(:, 2), 'w', 'EdgeColor', 'k');
+%     if elem(i, 2) == 2 % CZM
+%         plot(node(elem(i, 3:end), 2), node(elem(i, 3:end), 3), 'ro', 'MarkerFaceColor', 'r');
+%     end
+% end
+% 
+% title('single-edge notched beam (SE(B)) test');
+% xlabel('X');
+% ylabel('Y');
+% axis equal;
 
 end

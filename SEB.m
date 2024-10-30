@@ -5,8 +5,12 @@
 clear; close all; clc
 addpath("Func\")
 %%  ***  Reas Ansys Mesh  ***
-dx = 2;
-numY = [19, 81/1.5];
+% dx = 0.5;
+% numY = [19, 81/1.5];
+dx = 0.1;
+numY = [19, 81*2];
+% dx = 0.1;
+% numY = [19*2, 81*3];
 % dx = 4;
 % numY = [2, 3];
 [node, elem, nodeBou, elemBou] = generateMeshFEM_SEB(dx, numY);
@@ -36,18 +40,21 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-numStep = 100;
+duP = 0.1e-2;
+numStep = ceil(1/duP);
 un = zeros(2*Para.NNd, numStep + 1);
+CMOD = zeros(numStep, 1);
+P = zeros(numStep, 1);
 for n = 1 : numStep
     % Boundary condition
-    uP = n * 1e-3;
+    uP = - n * duP;
 
     % A starting value for the unknown must be chosen;
-    % usually the solution u_n from the last time step (n) is selected 
+    % usually the solution u_n from the last time step (n) is selected
     % modify u_n to satisfy the boundary conditions.
-    
+
     % Step of the iteration: v = 0
-    [BC, uv] = startingValue(un(:, n), uP);
+    [BC, uv] = startingValue(un(:, n), uP, nodeBou, node);
 
     % Calculate the cohesive nodal forces and the stiffness matrix
     [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elem, node, Para);
@@ -68,20 +75,51 @@ for n = 1 : numStep
 
         % step of the iteration: v + 1, renew u, R, dRdu
         uv = uv + duv;
-        [KCZM, Fcv, BC, uBC, KBC, bigN] = newtonIteration(uv, uP, sigma_c, ...
-            lamda_cr, delta_c, elem, node, Para, nodeBou);
+
+        % Calculate the cohesive nodal forces and the stiffness matrix
+        [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elem, node, Para);
 
         % Residual
-        Rv = K * uv + Fcv - BC.RHS + bigN * uBC;
+        Rv = K * uv + Fcv - BC.RHS;
         % Tanget matrix
-        dRduv = K + KCZM + bigN * KBC;
+        dRduv = K + KCZM;
+
+        tempP = sum(Rv(BC.DirchletDOF(abs(BC.Dirichlet) > 0)));
+%         tempP = (Rv(BC.DirchletDOF(1)));
+
+        % Modify Rv and dRduv to satisfy the boundary conditions.
+        [Rv, dRduv] = ApplyBC(BC, Rv, dRduv);
 
         idxIter = idxIter + 1;
     end
 
     un(:, n + 1) = uv;
+    CMOD(n) = uv(1);
+    P(n) = tempP;
     fprintf('Step %d, iteration number %d\n', n, idxIter);
+    if uv(1) > 0.25/2
+        break
+    end
 end
+figure
+plot(2 * CMOD(1:n), - 2 * P(1:n) * 75 / 1e3)
+xlim([0 0.25])
+
+%% Plot
+elemEla = elem(elem(:, 2) == 1, 3 : end);
+nodeEla = node(1 : max(max(elemEla)), 2:3);
+dispV = reshape(uv(1 : size(nodeEla, 1)*2), 2, [])';
+% uy
+figure
+axis equal;
+PlotContour(nodeEla,elemEla,dispV(:, 2),'uy',1);
+axis off;
+
+% ux
+figure
+axis equal;
+PlotContour(nodeEla,elemEla,dispV(:, 1),'ux',1);
+axis off;
 
 %% Sub function
 function [BC, uv] = startingValue(un, uP, nodeBou, node)
@@ -89,10 +127,10 @@ uv = un;
 
 % Boundary condition
 [fixNode, nodeForce] = generateBC_CZM_BilinearV2(nodeBou, node(:, 2:3), uP);
-BC = setBC(fixNode, nodeForce, Para.NNd*2);
+BC = setBC(fixNode, nodeForce, size(node, 1) * 2);
 
 % uv should satisfy the boundary condition
-uv(BC.DirchletDOF) = BC.Dirchlet;
+uv(BC.DirchletDOF) = BC.Dirichlet;
 end
 
 function [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elem, node, Para)
@@ -105,7 +143,11 @@ GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv, Para);
 end
 
 function [Rv, dRduv] = ApplyBC(BC, Rv, dRduv)
-% Because Δu = - dRduv * Rv
+% Because Δu = - dRduv \ Rv
 Rv(BC.DirchletDOF) = 0;
-
-end  
+dRduv(:, BC.DirchletDOF) = 0;
+dRduv(BC.DirchletDOF, :) = 0;
+for i = 1 : size(BC.DirchletDOF)
+    dRduv(BC.DirchletDOF(i), BC.DirchletDOF(i)) = 1e5;
+end
+end
