@@ -4,7 +4,8 @@
 
 clear; close all; clc
 addpath("Func\")
-%%  ***  Reas Ansys Mesh  ***
+%%  ***  Read Abaqus Mesh  ***
+
 % dx = 0.5;
 % numY = [19, 81/1.5];
 dx = 0.1;
@@ -97,7 +98,10 @@ for n = 1 : numStep
     CMOD(n) = uv(1);
     P(n) = tempP;
     fprintf('Step %d, iteration number %d\n', n, idxIter);
-    if uv(1) > 0.25/2
+%     if uv(1) > 0.25/2
+%         break
+%     end
+    if uv(1) > 0.01
         break
     end
 end
