@@ -5,8 +5,8 @@
 clear; close all; clc
 addpath("Func\")
 %%  ***  Read Abaqus Mesh  ***
-% YourModel = 'Job-CZM-mesh.inp';  % Choose your model
-YourModel = 'Job-CZM-mesh2.inp';  % Choose your model
+YourModel = 'Job-CZM-mesh.inp';  % Choose your model
+% YourModel = 'Job-CZM-mesh2.inp';  % Choose your model
 parts = loadinp(YourModel);
 
 % Copy the half model
@@ -57,10 +57,14 @@ nodeEla = node(1 : max(max(elemEla)), 2:3);
 % ylabel('Y');
 % axis equal;
 
+node = node(:, 2 : 3);
+elem = elem(:, 3 : end);
+
 %% ***  Material para  *** (Ambati's Paper)
 E = 14.2e3;
 Para.ndim = 2; % dim
-Para.isStress = 2;  % 1 - plane stress, 2 - plane strain
+% Para.isStress = 2;  % 1 - plane stress, 2 - plane strain
+Para.isStress = 1;  % 1 - plane stress, 2 - plane strain
 Para.E = E; % Young's Modulus based on (N/mm2)
 Para.nu = 0.35; % Poisson's Ratio
 Para.lambda = Para.E*Para.nu/((1+Para.nu)*(1-2*Para.nu)); % Lame Constant
@@ -71,11 +75,8 @@ Para.NNd = size(node,1); % number of nodes
 sigma_c = 3.56; % MPa
 G_c = 344; % J*m^-2
 delta_c = 2*G_c/sigma_c*1e-3; % mm
-% lamda_cr = 0.001;
-lamda_cr = 0.04;
-
-node = node(:, 2 : 3);
-elem = elem(:, 3 : end);
+lamda_cr = 0.001;
+% lamda_cr = 0.04;
 
 % Generate elastic stiffness matrix
 GaussInfo = deal(cell(2, 1));
@@ -85,11 +86,8 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 1e-3;
+duP = 5e-3;
 uP = 0;
-
-% duP = 0.5e-3;
-% numStep = ceil(0.01/duP);
 un = zeros(2*Para.NNd, 1);
 CMOD = 0;
 P = 0;
@@ -171,7 +169,12 @@ figure
 plot(CMOD(1:n), - P(1:n))
 xlim([0 0.25])
 
-%% Elastic problem without Cohesive zone model
+%% Elastic problem with Cohesive zone model
+sigma_c = 3.56; % MPa
+G_c = 344; % J*m^-2
+delta_c = 2*G_c/sigma_c*1e-3; % mm
+lamda_cr = 0.04;
+
 % Generate elastic stiffness matrix
 GaussInfo = deal(cell(2, 1));
 [GaussInfo{1}] = shapeFunc_valueDeriv(elemEla, node, Para);
@@ -180,9 +183,8 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 1e-3;
+duP = 5e-3;
 uP = 0;
-
 un = zeros(2*Para.NNd, 1);
 CMOD = 0;
 P = 0;
@@ -199,10 +201,13 @@ while abs(CMOD(n)) <= 0.25
     % Step of the iteration: v = 0
     [BC, uv] = startingValue(un, uP, node);
 
+    % Calculate the cohesive nodal forces and the stiffness matrix
+    [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para);
+
     % Residual
-    Rv = K * uv - BC.RHS;
+    Rv = K * uv + Fcv - BC.RHS;
     % Tanget matrix
-    dRduv = K;
+    dRduv = K + KCZM;
 
     % Modify Rv and dRduv to satisfy the boundary conditions.
     [Rv, dRduv] = ApplyBC(BC, Rv, dRduv);
@@ -216,10 +221,13 @@ while abs(CMOD(n)) <= 0.25
         % step of the iteration: v + 1, renew u, R, dRdu
         uv = uv + duv;
 
+        % Calculate the cohesive nodal forces and the stiffness matrix
+        [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para);
+
         % Residual
-        Rv = K * uv - BC.RHS;
+        Rv = K * uv + Fcv - BC.RHS;
         % Tanget matrix
-        dRduv = K;
+        dRduv = K + KCZM;
 
         tempP = sum(Rv(BC.DirchletDOF(abs(BC.Dirichlet) > 0))) * 75 / 1e3;
         %         tempP = (Rv(BC.DirchletDOF(1)));
@@ -233,17 +241,32 @@ while abs(CMOD(n)) <= 0.25
     un = uv;
     n = n + 1;
 
+    %     [CMOD] = [CMOD; uv(idxCMOD(1) * 2 - 1) - uv(idxCMOD(2) * 2 - 1)];
+    %     [P] = [P; tempP];
+
     CMOD(n) = uv(idxCMOD(1) * 2 - 1) - uv(idxCMOD(2) * 2 - 1);
     P(n) = tempP;
     %     if mod(n, 10) == 0
     fprintf('Step %d, iteration number %d, uP = %f, P = %f, CMOD= %f\n', n, idxIter, uP, tempP, CMOD(n));
     %     end
 
+%     if idxIter < 3
+%         duP = duP * 2;
+%     elseif idxIter > 5 && idxIter < 20
+%         duP = duP / 4;
+%     end
+%     elseif idxIter == 20
+% %         break
+%         uP = uP + 2 * duP;
+%         duP = duP / 10;
+%         n = n - 1;
+%     end
 end
-figure
+hold on
 plot(CMOD(1:n), - P(1:n))
 xlim([0 0.25])
 
+legend('λ = 0.001', 'λ = 0.04')
 %% Plot
 dispV = reshape(uv(1 : size(nodeEla, 1)*2), 2, [])';
 % uy

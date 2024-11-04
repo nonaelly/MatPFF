@@ -78,8 +78,8 @@ for ei = 1 : numEle
             t_n = s_c * (1 - l_e) / (1 - l_cr) / l_e * (d_n / d_c);
             Tc = [t_s; t_n];
         else
-            C_ss = 1e-10;
-            C_nn = 1e-10;
+            C_ss = 1e-15;
+            C_nn = 1e-15;
             C_sn = 0;
             C_ns = 0;
             Tc = zeros(2, 1);

@@ -6,10 +6,10 @@ clear; close all; clc
 addpath("Func\")
 %%  ***  Read Abaqus Mesh  ***
 
-% dx = 0.5;
-% numY = [19, 81/1.5];
-dx = 0.1;
-numY = [19, 81*2];
+dx = 0.5;
+numY = [19, 81/1.5];
+% dx = 0.1;
+% numY = [19, 81*2];
 % dx = 0.1;
 % numY = [19*2, 81*3];
 % dx = 4;
@@ -41,7 +41,7 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 0.1e-2;
+duP = 5e-3;
 numStep = ceil(1/duP);
 un = zeros(2*Para.NNd, numStep + 1);
 CMOD = zeros(numStep, 1);
@@ -85,7 +85,7 @@ for n = 1 : numStep
         % Tanget matrix
         dRduv = K + KCZM;
 
-        tempP = sum(Rv(BC.DirchletDOF(abs(BC.Dirichlet) > 0)));
+        tempP = 2 * sum(Rv(BC.DirchletDOF(abs(BC.Dirichlet) > 0))) * 75 / 1e3;
 %         tempP = (Rv(BC.DirchletDOF(1)));
 
         % Modify Rv and dRduv to satisfy the boundary conditions.
@@ -97,16 +97,16 @@ for n = 1 : numStep
     un(:, n + 1) = uv;
     CMOD(n) = uv(1);
     P(n) = tempP;
-    fprintf('Step %d, iteration number %d\n', n, idxIter);
-%     if uv(1) > 0.25/2
-%         break
-%     end
-    if uv(1) > 0.01
+    fprintf('Step %d, iteration number %d, uP = %f, P = %f, CMOD= %f\n', n, idxIter, uP, tempP, CMOD(n));
+    if uv(1) > 0.25/2
         break
     end
+%     if uv(1) > 0.01
+%         break
+%     end
 end
 figure
-plot(2 * CMOD(1:n), - 2 * P(1:n) * 75 / 1e3)
+plot(2 * CMOD(1:n), -  P(1:n))
 xlim([0 0.25])
 
 %% Plot
@@ -142,7 +142,7 @@ function [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elem, node
 elemCoh = elem(elem(:, 2) == 2, 3 : end);
 
 uv = reshape(uv, 2, [])';
-GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv, Para);
+GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node(:, 2:3), uv, Para);
 [KCZM, Fcv] = globalK2D_CZM_Bilinear(Para, elemCoh, GaussInfo, uv, 'bilinear', sigma_c, lamda_cr, delta_c);
 end
 
