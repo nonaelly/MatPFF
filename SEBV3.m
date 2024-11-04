@@ -68,10 +68,10 @@ Para.mu = Para.E/(2*(1+Para.nu)); % Lame Constant
 Para.NNd = size(node,1); % number of nodes
 
 %% Elastic problem with Cohesive zone model
-sigma_c = 1.1 * 3.56; % MPa
-G_c = 0.7 * 344; % J*m^-2
-% sigma_c = 3.56; % MPa
-% G_c = 344; % J*m^-2
+% sigma_c = 1.1 * 3.56; % MPa
+% G_c = 0.7 * 344; % J*m^-2
+sigma_c = 3.56; % MPa
+G_c = 344; % J*m^-2
 
 delta_c = G_c/sigma_c/exp(1)*1e-3; % mm
 % lamda_cr = 0.001;
