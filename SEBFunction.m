@@ -1,12 +1,7 @@
+function [CMOD, P, u, nodeEla, elemEla] = SEBFunction(YourModel, CZMType, sigma_c, G_c, duP, maxCMOD, varargin)
 % single-edge notched beam (SE(B)) test
-% <A bilinear cohesive zone model tailored for fracture of asphalt concrete
-%   considering viscoelastic bulk material>
 
-clear; close all; clc
-addpath("Func\")
 %%  ***  Read Abaqus Mesh  ***
-% YourModel = 'Job-CZM-mesh.inp';  % Choose your model
-YourModel = 'Job-CZM-mesh2.inp';  % Choose your model
 parts = loadinp(YourModel);
 
 % Copy the half model
@@ -72,14 +67,13 @@ Para.mu = Para.E/(2*(1+Para.nu)); % Lame Constant
 Para.NNd = size(node,1); % number of nodes
 
 %% Elastic problem with Cohesive zone model
-% sigma_c = 3.56; % MPa
-% G_c = 344; % J*m^-2
-sigma_c = 1.1 * 3.56; % MPa
-G_c = 0.7 * 344; % J*m^-2
-
-delta_c = 2*G_c/sigma_c*1e-3; % mm
-lamda_cr = 0.001;
-% lamda_cr = 0.04;
+switch CZMType
+    case 'bilinear'
+        delta_c = 2*G_c/sigma_c*1e-3; % mm
+    case 'Exp'
+        delta_c = G_c/sigma_c/exp(1)*1e-3; % mm
+end
+lamda_cr = varargin{1};
 
 % Generate elastic stiffness matrix
 GaussInfo = deal(cell(2, 1));
@@ -89,14 +83,14 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 5e-3;
 uP = 0;
 un = zeros(2*Para.NNd, 1);
 CMOD = 0;
 P = 0;
 idxCMOD = find(ismember(node, [0, 0], 'rows'));
 n = 1;
-while abs(CMOD(n)) <= 0.25
+u = [];
+while abs(CMOD(n)) <= maxCMOD
     % Boundary condition
     uP = uP - duP;
 
@@ -108,7 +102,7 @@ while abs(CMOD(n)) <= 0.25
     [BC, uv] = startingValue(un, uP, node);
 
     % Calculate the cohesive nodal forces and the stiffness matrix
-    [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para);
+    [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, delta_c, elemCoh, node, Para, CZMType, lamda_cr);
 
     % Residual
     Rv = K * uv + Fcv - BC.RHS;
@@ -128,7 +122,7 @@ while abs(CMOD(n)) <= 0.25
         uv = uv + duv;
 
         % Calculate the cohesive nodal forces and the stiffness matrix
-        [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para);
+        [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, delta_c, elemCoh, node, Para, CZMType, lamda_cr);
 
         % Residual
         Rv = K * uv + Fcv - BC.RHS;
@@ -145,144 +139,16 @@ while abs(CMOD(n)) <= 0.25
     end
 
     un = uv;
+    [u] = [u, un];
     n = n + 1;
-
-    %     [CMOD] = [CMOD; uv(idxCMOD(1) * 2 - 1) - uv(idxCMOD(2) * 2 - 1)];
-    %     [P] = [P; tempP];
 
     CMOD(n) = uv(idxCMOD(1) * 2 - 1) - uv(idxCMOD(2) * 2 - 1);
     P(n) = tempP;
-    %     if mod(n, 10) == 0
+
     fprintf('Step %d, iteration number %d, uP = %f, P = %f, CMOD= %f\n', n, idxIter, uP, tempP, CMOD(n));
-    %     end
-
-%     if idxIter < 3
-%         duP = duP * 2;
-%     elseif idxIter > 5 && idxIter < 20
-%         duP = duP / 4;
-%     end
-%     elseif idxIter == 20
-% %         break
-%         uP = uP + 2 * duP;
-%         duP = duP / 10;
-%         n = n - 1;
-%     end
 end
-figure
-plot(CMOD(1:n), - P(1:n))
-xlim([0 0.25])
 
-%% Elastic problem with Cohesive zone model
-sigma_c = 3.56; % MPa
-G_c = 344; % J*m^-2
-delta_c = 2*G_c/sigma_c*1e-3; % mm
-lamda_cr = 0.04;
-
-% Generate elastic stiffness matrix
-GaussInfo = deal(cell(2, 1));
-[GaussInfo{1}] = shapeFunc_valueDeriv(elemEla, node, Para);
-K = globalK2D(Para, elemEla, GaussInfo{1});
-
-% Newton-Raphson method
-tole = 1e-6;
-
-duP = 5e-3;
-uP = 0;
-un = zeros(2*Para.NNd, 1);
-CMOD = 0;
-P = 0;
-idxCMOD = find(ismember(node, [0, 0], 'rows'));
-n = 1;
-while abs(CMOD(n)) <= 0.25
-    % Boundary condition
-    uP = uP - duP;
-
-    % A starting value for the unknown must be chosen;
-    % usually the solution u_n from the last time step (n) is selected
-    % modify u_n to satisfy the boundary conditions.
-
-    % Step of the iteration: v = 0
-    [BC, uv] = startingValue(un, uP, node);
-
-    % Calculate the cohesive nodal forces and the stiffness matrix
-    [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para);
-
-    % Residual
-    Rv = K * uv + Fcv - BC.RHS;
-    % Tanget matrix
-    dRduv = K + KCZM;
-
-    % Modify Rv and dRduv to satisfy the boundary conditions.
-    [Rv, dRduv] = ApplyBC(BC, Rv, dRduv);
-
-    idxIter = 0;
-
-    while max(abs(Rv)) > tole && idxIter < 20
-        % step of the iteration: v = 1, 2, ...
-        duv = -dRduv\Rv;
-
-        % step of the iteration: v + 1, renew u, R, dRdu
-        uv = uv + duv;
-
-        % Calculate the cohesive nodal forces and the stiffness matrix
-        [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para);
-
-        % Residual
-        Rv = K * uv + Fcv - BC.RHS;
-        % Tanget matrix
-        dRduv = K + KCZM;
-
-        tempP = sum(Rv(BC.DirchletDOF(abs(BC.Dirichlet) > 0))) * 75 / 1e3;
-        %         tempP = (Rv(BC.DirchletDOF(1)));
-
-        % Modify Rv and dRduv to satisfy the boundary conditions.
-        [Rv, dRduv] = ApplyBC(BC, Rv, dRduv);
-
-        idxIter = idxIter + 1;
-    end
-
-    un = uv;
-    n = n + 1;
-
-    %     [CMOD] = [CMOD; uv(idxCMOD(1) * 2 - 1) - uv(idxCMOD(2) * 2 - 1)];
-    %     [P] = [P; tempP];
-
-    CMOD(n) = uv(idxCMOD(1) * 2 - 1) - uv(idxCMOD(2) * 2 - 1);
-    P(n) = tempP;
-    %     if mod(n, 10) == 0
-    fprintf('Step %d, iteration number %d, uP = %f, P = %f, CMOD= %f\n', n, idxIter, uP, tempP, CMOD(n));
-    %     end
-
-%     if idxIter < 3
-%         duP = duP * 2;
-%     elseif idxIter > 5 && idxIter < 20
-%         duP = duP / 4;
-%     end
-%     elseif idxIter == 20
-% %         break
-%         uP = uP + 2 * duP;
-%         duP = duP / 10;
-%         n = n - 1;
-%     end
 end
-hold on
-plot(CMOD(1:n), - P(1:n))
-xlim([0 0.25])
-
-legend('λ = 0.001', 'λ = 0.04')
-%% Plot
-dispV = reshape(uv(1 : size(nodeEla, 1)*2), 2, [])';
-% uy
-figure
-axis equal;
-PlotContour(nodeEla,elemEla,dispV(:, 2),'uy',1);
-axis off;
-
-% ux
-figure
-axis equal;
-PlotContour(nodeEla,elemEla,dispV(:, 1),'ux',1);
-axis off;
 
 %% Sub function
 function [BC, uv] = startingValue(un, uP, node)
@@ -310,11 +176,17 @@ BC = setBC(fixNode, nodeForce, size(node, 1) * 2);
 uv(BC.DirchletDOF) = BC.Dirichlet;
 end
 
-function [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, lamda_cr, delta_c, elemCoh, node, Para)
+function [KCZM, Fcv] = CohesiveMatrix(uv, sigma_c, delta_c, elemCoh, node, Para, CZMType, lamda_cr)
 
 uv = reshape(uv, 2, [])';
 GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv, Para);
-[KCZM, Fcv] = globalK2D_CZM_Bilinear(Para, elemCoh, GaussInfo, uv, 'bilinear', sigma_c, lamda_cr, delta_c);
+switch CZMType
+    case 'bilinear'
+        [KCZM, Fcv] = globalK2D_CZM_Bilinear(Para, elemCoh, GaussInfo, uv, CZMType, sigma_c, lamda_cr, delta_c);
+    case 'Exp'
+        [KCZM, Fcv] = globalK2D_CZM_Exponential(Para, elemCoh, GaussInfo, uv, CZMType, sigma_c, lamda_cr, delta_c);
+end
+
 end
 
 function [Rv, dRduv] = ApplyBC(BC, Rv, dRduv)

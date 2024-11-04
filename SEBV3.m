@@ -70,8 +70,10 @@ Para.NNd = size(node,1); % number of nodes
 %% Elastic problem with Cohesive zone model
 % sigma_c = 1.1 * 3.56; % MPa
 % G_c = 0.7 * 344; % J*m^-2
-sigma_c = 3.56; % MPa
-G_c = 344; % J*m^-2
+sigma_c = 3.92; % MPa
+G_c = 241; % J*m^-2
+% sigma_c = 3.56; % MPa
+% G_c = 344; % J*m^-2
 
 delta_c = G_c/sigma_c/exp(1)*1e-3; % mm
 % lamda_cr = 0.001;
@@ -88,7 +90,7 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 5e-3;
+duP = 3e-3;
 uP = 0;
 
 % duP = 0.5e-3;
