@@ -20,8 +20,8 @@ maxCMOD = 0.25; % mm
 [CMOD{3}, P{3}, u{3}] = SEBFunction(YourModel, 'Exp', sigma_c, G_c, duP, maxCMOD, 0);
 
 %% Model 2
-% YourModel = 'Job-CZM-mesh.inp';  % Choose your model
-YourModel = 'Job-CZM-mesh2.inp';  % Choose your model
+YourModel = 'Job-CZM-mesh.inp';  % Choose your model
+% YourModel = 'Job-CZM-mesh2.inp';  % Choose your model
 
 sigma_c = 3.56; % MPa
 G_c = 344; % J*m^-2
