@@ -63,9 +63,10 @@ for ei = 1 : numEle
             C_nn = C_ss;
             C_sn = 0;
             C_ns = 0;
-            t_s = s_c / l_cr * (d_s / d_c);
+
             t_n = s_c / l_cr * (d_n / d_c);
-            Tc = [t_s; t_n];
+            t_s = s_c / l_cr * (d_s / d_c);
+            
         elseif l_e >= l_cr && l_e < 1
             C_ss = - d_c*s_c/(1-l_cr)*((d_s/(l_e*d_c^2))^2)...
                 + (1-l_e)*(d_c*s_c)/(1-l_cr)*(1/(l_e*d_c^2)-1/(l_e^3)*(d_s^2/(d_c^4)));
@@ -76,19 +77,26 @@ for ei = 1 : numEle
             C_ns = C_sn;
             t_s = s_c * (1 - l_e) / (1 - l_cr) / l_e * (d_s / d_c);
             t_n = s_c * (1 - l_e) / (1 - l_cr) / l_e * (d_n / d_c);
-            Tc = [t_s; t_n];
+            
         else
             C_ss = 1e-15;
             C_nn = 1e-15;
             C_sn = 0;
             C_ns = 0;
-            Tc = zeros(2, 1);
+            t_s = 0;
+            t_n = 0;
         end
+        if d_n < 0
+            C_nn = C_nn * 1e5;
+            t_n = C_nn * d_n;
+        end
+
+        Tc = [t_s; t_n];
         D = [C_ss, C_sn;
             C_ns, C_nn];
         % compute element stiffness at quadrature point
         Ke = Ke + B' * D * B * JW(gpti);
-                Fe = Fe + B' * Tc * JW(gpti);
+        Fe = Fe + B' * Tc * JW(gpti);
 
     end
     KVals(:, ei) = Ke(:);

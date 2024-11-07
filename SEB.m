@@ -41,7 +41,7 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 5e-3;
+duP = 2.5e-3;
 numStep = ceil(1/duP);
 un = zeros(2*Para.NNd, numStep + 1);
 CMOD = zeros(numStep, 1);

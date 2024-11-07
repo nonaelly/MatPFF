@@ -76,6 +76,11 @@ for ei = 1 : numEle
         t_s = temp1 * (beta ^ 2) * d_s;
         t_n = temp1 * d_n;
 
+        if d_n < 0
+            C_nn = C_nn * 1e8;
+            t_n = C_nn * d_n;
+        end
+
         Tc = [t_s; t_n];
         D = [C_ss, C_sn;
             C_ns, C_nn];
