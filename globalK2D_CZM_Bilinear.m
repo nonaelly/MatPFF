@@ -86,10 +86,10 @@ for ei = 1 : numEle
             t_s = 0;
             t_n = 0;
         end
-        if d_n < 0
-            C_nn = C_nn * 1e5;
-            t_n = C_nn * d_n;
-        end
+%         if d_n < 0
+%             C_nn = C_nn * 1e5;
+%             t_n = C_nn * d_n;
+%         end
 
         Tc = [t_s; t_n];
         D = [C_ss, C_sn;

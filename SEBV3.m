@@ -90,7 +90,7 @@ K = globalK2D(Para, elemEla, GaussInfo{1});
 % Newton-Raphson method
 tole = 1e-6;
 
-duP = 1.5e-3;
+duP = 2.5e-3;
 uP = 0;
 
 % duP = 0.5e-3;

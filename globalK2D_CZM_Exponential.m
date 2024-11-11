@@ -79,6 +79,8 @@ for ei = 1 : numEle
         if d_n < 0
             C_nn = C_nn * 1e8;
             t_n = C_nn * d_n;
+
+% t_n = 1e8 * t_n;
         end
 
         Tc = [t_s; t_n];
