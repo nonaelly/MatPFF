@@ -70,6 +70,7 @@ switch geoType
         O = varargin{3};
         numX = varargin{4};
         numY = varargin{5};
+        isCoh = varargin{6};
 
         % 生成节点
         node = zeros((numX+1) * (numY+1), 3);
@@ -125,7 +126,9 @@ switch geoType
             nodes = node(elem(i, 3:end), 2:3);
             fill(nodes(:, 1), nodes(:, 2), 'w', 'EdgeColor', 'k');
         end
-        plot(node(:, 2), node(:, 3), 'ro', 'MarkerFaceColor', 'r');
+        if isCoh
+            plot(node(:, 2), node(:, 3), 'ro', 'MarkerFaceColor', 'r');
+        end
         title('Rectangular Mesh Plot');
         xlabel('X');
         ylabel('Y');
