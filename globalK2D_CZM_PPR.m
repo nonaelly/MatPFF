@@ -90,13 +90,22 @@ for ei = 1 : numEle
         D_tMax = DMax.ValMax{ei}(gpti * 2);
         if Delta_n > delta_n || (Delta_n <= delta_n && abs(Delta_t) > delta_t)
             % interface failure
-            D_nn = 1e-15;
+%             D_nn = 0;
+%             D_nt = 0;
+%             D_tt = 0;
+%             D_tn = 0;
+% 
+%             T_n = 0;
+%             T_t = 0;
+
+            D_nn = 1e-16;
             D_nt = 0;
-            D_tt = 1e-15;
+            D_tt = 1e-16;
             D_tn = 0;
 
-            T_n = 1e-15;
-            T_t = 1e-15;
+            T_n = 1e-16;
+            T_t = 1e-16;
+
         else
             % normal state judge
             if Delta_n >= D_nMax
