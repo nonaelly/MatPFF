@@ -32,6 +32,7 @@ end
 elemCoh = elem(elem(:, 2) == 2, 3 : end);
 elemEla = elem(elem(:, 2) == 1, 3 : end);
 nodeEla = node(1 : max(max(elemEla)), 2 : 3);
+elemIdxCoh = elem(elem(:, 2) == 2, 1);
 
 node = node(:, 2 : 3);
 elem = elem(:, 3 : end);
@@ -69,22 +70,19 @@ tole = 1e-6;
 uS = 0;
 un = zeros(2*Para.NNd, 1);
 t = 0;
-% delatT = 0.005;
-% vec = 0.48; % mm/s
-% % tMax = 3.64 / vec;
-% tMax = 3.7 / vec;
 
-delatT = 0.01;
+delatT = 0.05;
 vec = 0.48; % mm/s
-tMax = 3.64 / vec;
-% tMax = 5 / vec;
+% tMax = 3.64 / vec;
+tMax = 5 / vec;
 
-[DMax] = initial_DMax(elem, Para);
+[sVar] = initial_StateVaribles(elem, Para);
 P = [];
 CMOD = [];
 q = 1;
 u = [];
 idxP = find(ismember(node, [0, 5], 'rows'));
+FailNode = [];
 while t <= tMax
     % Boundary condition
     uS = vec * t;
@@ -97,7 +95,7 @@ while t <= tMax
     [BC, uv] = startingValue(un, uS, node, coNodesDown);
 
     % Calculate the cohesive nodal forces and the stiffness matrix
-    [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax);
+    [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, sVar);
 
     % Residual
     Rv = K * uv + Fcv - BC.RHS;
@@ -113,6 +111,7 @@ while t <= tMax
     idxIter = 0;
 
     while max(abs(Rv)) > tole && idxIter < 20
+        FailNode = findFailureNodes(sVar, elemIdxCoh, elemCoh, coNodesDown);
         % step of the iteration: v = 1, 2, ...
         duv = -dRduv\Rv;
 
@@ -120,7 +119,7 @@ while t <= tMax
         uv = uv + duv;
 
         % Calculate the cohesive nodal forces and the stiffness matrix
-        [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax);
+        [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, sVar);
 
         % Residual
         Rv = K * uv + Fcv - BC.RHS;
@@ -148,9 +147,9 @@ while t <= tMax
     [u] = [u, un];
     q = q + 1;
 
-    [~, ~, GaussInfo] = CohesiveMatrix(un, elemCoh, node, Para, ParaPPR, DMax);
-    DMax = renew_DMax(Para, elemCoh, GaussInfo, reshape(un, 2, [])', DMax);
-
+    [~, ~, GaussInfo] = CohesiveMatrix(un, elemCoh, node, Para, ParaPPR, sVar);
+    sVar = renew_DMax(Para, elem, elemIdxCoh, GaussInfo, reshape(un, 2, [])', sVar);
+    FailNode = findFailureNodes(sVar, elemIdxCoh, elemCoh, coNodesDown);
     %     if uv(44) >= delta_n-0.03
     %         1;
     %     end
@@ -214,11 +213,11 @@ BC = setBC(fixNode, nodeForce, size(node, 1) * 2);
 uv(BC.DirchletDOF) = BC.Dirichlet;
 end
 
-function [KCZM, Fcv, GaussInfo] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax)
+function [KCZM, Fcv, GaussInfo] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, sVar)
 
 uv = reshape(uv, 2, [])';
 GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv, Para);
-[KCZM, Fcv] = globalK2D_CZM_PPR(Para, elemCoh, GaussInfo, uv, 'PPR', ParaPPR, DMax);
+[KCZM, Fcv] = globalK2D_CZM_PPR(Para, elemCoh, GaussInfo, uv, 'PPR', ParaPPR, sVar);
 end
 
 function [Rv, dRduv] = ApplyBC(BC, Rv, dRduv)

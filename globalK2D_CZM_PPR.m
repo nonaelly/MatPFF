@@ -6,7 +6,7 @@ numEDofs = numEleNd * ndim;
 NNd = Para.NNd;
 if strcmp(czmType, 'PPR')
     ParaPPR = varargin{1};
-    DMax = varargin{2};
+    sVar = varargin{2};
 end
 % PPR parameters
 delta_n = ParaPPR(1);
@@ -52,6 +52,7 @@ for ei = 1 : numEle
     dxdxi = GaussInfo.SpDerivPara{ei};
     JW = GaussInfo.JW{ei};
     H1H2 = GaussInfo.H{ei};
+    isFail = sVar.isFail{ei};
 
     J11 = dxdxi(1);
     J12 = dxdxi(2);
@@ -86,110 +87,116 @@ for ei = 1 : numEle
         Delta_n = DELTA(2) + 1e-16;
         Delta_t = DELTA(1) + 1e-16;
 
-        D_nMax = DMax.ValMax{ei}(gpti * 2 - 1);
-        D_tMax = DMax.ValMax{ei}(gpti * 2);
-        if Delta_n > delta_n || (Delta_n <= delta_n && abs(Delta_t) > delta_t)
-            % interface failure
-            D_nn = 1e-5;
-            D_nt = 0;
-            D_tt = 1e-5;
-            D_tn = 0;
+        D_nMax = sVar.ValMax{ei}(gpti * 2 - 1);
+        D_tMax = sVar.ValMax{ei}(gpti * 2);
+        if ~sVar.isFail{ei}(gpti) % not failure
+            if Delta_n > delta_n || (Delta_n <= delta_n && abs(Delta_t) > delta_t)
+                % interface failure
+                D_nn = 0;
+                D_nt = 0;
+                D_tt = 0;
+                D_tn = 0;
 
-            T_n = 1e-8;
-            T_t = 1e-8;
+                T_n = 0;
+                T_t = 0;
+                sVar.isFail{ei}(gpti) = 1;
+            else
+                % normal state judge
+                if Delta_n >= D_nMax
+                    % soften
+                    D_nn = Gamma_n / delta_n^2 * ((m^2 - m) * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 2) ...
+                        + (alpha_k^2 - alpha_k) * (1 - Delta_n / delta_n)^(alpha_k - 2) * (m / alpha_k + Delta_n / delta_n)^m ...
+                        - 2 * alpha_k * m * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^(m - 1))...
+                        * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0));
+
+                    D_nt = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
+                        * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
+                        - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n) * Delta_t / abs(Delta_t);
+
+                    T_n = Gamma_n / delta_n * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
+                        * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0));
+
+                elseif Delta_n < D_nMax && Delta_n >= 0
+                    % unload / reload
+                    D_nn = Gamma_n / delta_n * (m * (1 - D_nMax / delta_n)^alpha_k * (m / alpha_k + D_nMax / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - D_nMax / delta_n)^(alpha_k - 1) * (m / alpha_k + D_nMax / delta_n)^m)...
+                        * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0))...
+                        * alpha_r / D_nMax * (Delta_n / D_nMax)^(alpha_r - 1);
+
+                    D_nt = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - D_nMax / delta_n)^alpha_k * (m / alpha_k + D_nMax / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - D_nMax / delta_n)^(alpha_k - 1) * (m / alpha_k + D_nMax / delta_n)^m)...
+                        * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
+                        - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n) * Delta_t / abs(Delta_t) * (Delta_n / D_nMax)^alpha_r;
+
+                    T_n = Gamma_n / delta_n * (m * (1 - D_nMax / delta_n)^alpha_k * (m / alpha_k + D_nMax / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - D_nMax / delta_n)^(alpha_k - 1) * (m / alpha_k + D_nMax / delta_n)^m)...
+                        * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0))...
+                        * (Delta_n / D_nMax)^alpha_r;
+
+                elseif Delta_n < 0
+                    % contact
+                    D_nn = alpha_c;
+                    D_nt = 0;
+                    T_n = D_nn * Delta_n;
+                end
+
+                % tangent state judge
+                if Delta_n < 0
+                    % contact (set Delta_n = 0)
+                    Delta_n = 0;
+                end
+
+                if abs(Delta_t) >= D_tMax
+                    % soften
+                    D_tt = Gamma_t / delta_t^2 * ((n^2 - n) * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 2) ...
+                        + (beta_k^2 - beta_k) * (1 - abs(Delta_t) / delta_t)^(beta_k - 2) * (n / beta_k + abs(Delta_t) / delta_t)^n ...
+                        - 2 * beta_k * n * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1))...
+                        * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0));
+
+                    D_tn = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
+                        * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
+                        - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n) * Delta_t / abs(Delta_t);
+
+                    T_t = Gamma_t / delta_t * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
+                        - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n)...
+                        * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0)) * Delta_t / abs(Delta_t);
+
+                elseif abs(Delta_t) < D_tMax
+                    % if abs(Delta_t) < D_tMax
+                    % unload / reload
+                    D_tt = Gamma_t / delta_t * (n * (1 - D_tMax / delta_t)^beta_k * (n / beta_k + D_tMax / delta_t)^(n - 1) ...
+                        - beta_k * (1 - D_tMax / delta_t)^(beta_k - 1) * (n / beta_k + D_tMax / delta_t)^n)...
+                        * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0))...
+                        * beta_r / D_tMax * (abs(Delta_t) / D_tMax)^(beta_r - 1);
+
+                    D_tn = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
+                        - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
+                        * (n * (1 - D_tMax / delta_t)^beta_k * (n / beta_k + D_tMax / delta_t)^(n - 1) ...
+                        - beta_k * (1 - D_tMax / delta_t)^(beta_k - 1) * (n / beta_k + D_tMax / delta_t)^n) * Delta_t / abs(Delta_t) * (abs(Delta_t) / D_tMax)^beta_r;
+
+                    T_t = Gamma_t / delta_t * (n * (1 - D_tMax / delta_t)^beta_k * (n / beta_k + D_tMax / delta_t)^(n - 1) ...
+                        - beta_k * (1 - D_tMax / delta_t)^(beta_k - 1) * (n / beta_k + D_tMax / delta_t)^n)...
+                        * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0)) ...
+                        * (abs(Delta_t) / D_tMax)^beta_r * Delta_t / abs(Delta_t);
+
+                end
+            end
 
         else
-            % normal state judge
-            if Delta_n >= D_nMax
-                % soften
-                D_nn = Gamma_n / delta_n^2 * ((m^2 - m) * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 2) ...
-                    + (alpha_k^2 - alpha_k) * (1 - Delta_n / delta_n)^(alpha_k - 2) * (m / alpha_k + Delta_n / delta_n)^m ...
-                    - 2 * alpha_k * m * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^(m - 1))...
-                    * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0));
+            % interface failure
+            D_nn = 0;
+            D_nt = 0;
+            D_tt = 0;
+            D_tn = 0;
 
-                D_nt = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
-                    * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
-                    - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n) * Delta_t / abs(Delta_t);
-
-                T_n = Gamma_n / delta_n * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
-                    * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0));
-
-            elseif Delta_n < D_nMax && Delta_n >= 0
-                % unload / reload
-                D_nn = Gamma_n / delta_n * (m * (1 - D_nMax / delta_n)^alpha_k * (m / alpha_k + D_nMax / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - D_nMax / delta_n)^(alpha_k - 1) * (m / alpha_k + D_nMax / delta_n)^m)...
-                    * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0))...
-                    * alpha_r / D_nMax * (Delta_n / D_nMax)^(alpha_r - 1);
-
-                D_nt = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - D_nMax / delta_n)^alpha_k * (m / alpha_k + D_nMax / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - D_nMax / delta_n)^(alpha_k - 1) * (m / alpha_k + D_nMax / delta_n)^m)...
-                    * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
-                    - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n) * Delta_t / abs(Delta_t) * (Delta_n / D_nMax)^alpha_r;
-
-                T_n = Gamma_n / delta_n * (m * (1 - D_nMax / delta_n)^alpha_k * (m / alpha_k + D_nMax / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - D_nMax / delta_n)^(alpha_k - 1) * (m / alpha_k + D_nMax / delta_n)^m)...
-                    * (Gamma_t * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^n + max(phi_t - phi_n, 0))...
-                    * (Delta_n / D_nMax)^alpha_r;
-
-            elseif Delta_n < 0
-                % contact
-                D_nn = alpha_c;
-                D_nt = 0;
-                T_n = D_nn * Delta_n;
-            end
-
-            % tangent state judge
-            if Delta_n < 0
-                % contact (set Delta_n = 0)
-                Delta_n = 0;
-            end
-
-            if abs(Delta_t) >= D_tMax
-                % soften
-                D_tt = Gamma_t / delta_t^2 * ((n^2 - n) * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 2) ...
-                    + (beta_k^2 - beta_k) * (1 - abs(Delta_t) / delta_t)^(beta_k - 2) * (n / beta_k + abs(Delta_t) / delta_t)^n ...
-                    - 2 * beta_k * n * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1))...
-                    * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0));
-
-                D_tn = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
-                    * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
-                    - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n) * Delta_t / abs(Delta_t);
-
-                T_t = Gamma_t / delta_t * (n * (1 - abs(Delta_t) / delta_t)^beta_k * (n / beta_k + abs(Delta_t) / delta_t)^(n - 1) ...
-                    - beta_k * (1 - abs(Delta_t) / delta_t)^(beta_k - 1) * (n / beta_k + abs(Delta_t) / delta_t)^n)...
-                    * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0)) * Delta_t / abs(Delta_t);
-
-            elseif abs(Delta_t) < D_tMax
-                % if abs(Delta_t) < D_tMax
-                % unload / reload
-                D_tt = Gamma_t / delta_t * (n * (1 - D_tMax / delta_t)^beta_k * (n / beta_k + D_tMax / delta_t)^(n - 1) ...
-                    - beta_k * (1 - D_tMax / delta_t)^(beta_k - 1) * (n / beta_k + D_tMax / delta_t)^n)...
-                    * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0))...
-                    * beta_r / D_tMax * (abs(Delta_t) / D_tMax)^(beta_r - 1);
-
-                D_tn = Gamma_n * Gamma_t / (delta_n * delta_t) * (m * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^(m - 1) ...
-                    - alpha_k * (1 - Delta_n / delta_n)^(alpha_k - 1) * (m / alpha_k + Delta_n / delta_n)^m)...
-                    * (n * (1 - D_tMax / delta_t)^beta_k * (n / beta_k + D_tMax / delta_t)^(n - 1) ...
-                    - beta_k * (1 - D_tMax / delta_t)^(beta_k - 1) * (n / beta_k + D_tMax / delta_t)^n) * Delta_t / abs(Delta_t) * (abs(Delta_t) / D_tMax)^beta_r;
-
-                T_t = Gamma_t / delta_t * (n * (1 - D_tMax / delta_t)^beta_k * (n / beta_k + D_tMax / delta_t)^(n - 1) ...
-                    - beta_k * (1 - D_tMax / delta_t)^(beta_k - 1) * (n / beta_k + D_tMax / delta_t)^n)...
-                    * (Gamma_n * (1 - Delta_n / delta_n)^alpha_k * (m / alpha_k + Delta_n / delta_n)^m + max(phi_n - phi_t, 0)) ...
-                    * (abs(Delta_t) / D_tMax)^beta_r * Delta_t / abs(Delta_t);
-
-            end
+            T_n = 0;
+            T_t = 0;
         end
 
-        if D_tn ~= D_nt
-            if abs(D_tn - D_nt) > 1e-5
-                1;
-            end
-            D_tn = (D_tn + D_nt) / 2;
-            D_nt = D_tn;
-        end
+
         Tc = [T_t; T_n];
         D = [D_tt, D_tn;
             D_nt, D_nn];

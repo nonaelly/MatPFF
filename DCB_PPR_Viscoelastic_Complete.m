@@ -44,6 +44,7 @@ end
 elemCoh = elem(elem(:, 2) == 2, 3 : end);
 elemEla = elem(elem(:, 2) == 1, 3 : end);
 nodeEla = node(1 : max(max(elemEla)), 2 : 3);
+elemIdxCoh = elem(elem(:, 2) == 2, 1);
 
 node = node(:, 2 : 3);
 elem = elem(:, 3 : end);
@@ -81,16 +82,16 @@ tole = 1e-6;
 uS = 0;
 un = zeros(2*Para.NNd, 1);
 t = 0;
-delatT = 0.05;
+delatT = 0.03;
 vec = 0.48; % mm/s
-tMax = 5 / vec;
+% tMax = 5 / vec;
 
 % tMax = 5 / vec;
 % 9.594
 % tMax = 9.594;
-% tMax = 5;
+tMax = 9.8;
 
-[DMax] = initial_DMax(elem, Para);
+[sVar] = initial_StateVaribles(elem, Para);
 P = [];
 CMOD = [];
 q = 1;
@@ -111,20 +112,12 @@ while t <= tMax
     [BC, uv] = startingValue(un, uS, node, coNodesDown);
 
     % Calculate the cohesive nodal forces and the stiffness matrix
-    [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax);
+    [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, sVar);
 
     % Residual
     Rv = K * uv + Fcv - BC.RHS;
     % Tanget matrix
     dRduv = K + KCZM;
-
-    %     tempP = - full(sum(Fcv(coNodesDown(:, 1) * 2)));
-    % tempP = - full(sum(Fcv(coNodesDown(end - 10, 1) * 2)));
-    % tempP = - full(sum(Fcv(coNodesDown(28, 1) * 2)));
-    % tempP = - full(sum(Fcv(coNodesDown(1, 1) * 2)));
-    % tempP = - full(Fcv(coNodesDown(1, 1) * 2));
-    % tempP = - full(Fcv(coNodesDown(1 : 10, 1) * 2));
-    % tempP = - full(Fcv(coNodesUp(1 : 10, 1) * 2));
 
     TempRv = K * uv + Fcv - BC.RHS;
     tempP = - TempRv(idxP * 2);
@@ -142,7 +135,7 @@ while t <= tMax
         uv = uv + duv;
 
         % Calculate the cohesive nodal forces and the stiffness matrix
-        [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax);
+        [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, sVar);
 
         % Residual
         Rv = K * uv + Fcv - BC.RHS;
@@ -157,13 +150,6 @@ while t <= tMax
         if max(abs(Rv)) <= tole || idxIter >= 20
             tempFixP = K * uv;
             tempFixP = tempFixP(coNodesDown(end, 1) * 2);
-            %             tempP = - (full(sum(Fcv(coNodesDown(:, 1) * 2))) + tempFixP);
-            % tempP = - full(sum(Fcv(coNodesDown(end - 10, 1) * 2)));
-            % tempP = - full(sum(Fcv(coNodesDown(28, 1) * 2)));
-            % tempP = - full(sum(Fcv(coNodesDown(1, 1) * 2)));
-            % tempP = - full(Fcv(coNodesDown(1, 1) * 2));
-            % tempP = - full(Fcv(coNodesDown(1 : 10, 1) * 2));
-            % tempP = - full(Fcv(coNodesUp(1 : 10, 1) * 2));
 
             TempRv = K * uv + Fcv - BC.RHS;
             tempP = - TempRv(idxP * 2);
@@ -181,20 +167,9 @@ while t <= tMax
     [u] = [u, un];
     q = q + 1;
 
-    [~, ~, GaussInfo] = CohesiveMatrix(un, elemCoh, node, Para, ParaPPR, DMax);
-    DMax = renew_DMax(Para, elemCoh, GaussInfo, reshape(un, 2, [])', DMax);
+    [~, ~, GaussInfo] = CohesiveMatrix(un, elemCoh, node, Para, ParaPPR, sVar);
+    sVar = renew_DMax(Para, elem, elemIdxCoh, GaussInfo, reshape(un, 2, [])', sVar);
 
-    if uS > 2.16
-        1;
-    end
-    %     if mod(t, rangeVtk) < 1e-8 || mod(t, rangeVtk) > rangeVtk - 1e-8
-    %         dispV = reshape(un(1 : size(nodeEla, 1)*2), 2, [])';
-    %         numVtk = numVtk + 1;
-    %         vtkName = ['PPR-test-complete-model-', num2str(numVtk),'.vtk'];
-    %         vtkwrite(vtkName, 'UNSTRUCTURED_GRID', nodeEla(:,1), nodeEla(:,2), nodeEla(:,1)*0, ...
-    %             'cells', elemEla, 'cell_types', 9, 'vectors', 'u', ...
-    %             dispV(:, 1)', dispV(:, 2)', 0*dispV(:, 1)');
-    %     end
 end
 
 %% Plot
