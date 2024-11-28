@@ -36,18 +36,12 @@ nodeEla = node(1 : max(max(elemEla)), 2 : 3);
 node = node(:, 2 : 3);
 elem = elem(:, 3 : end);
 
-%% PPR cohesive model parameters
-sigma_max_0 = 0.5; % MPa
-alpha_k = 3.10;
+%% cohesive model parameters
+sigma_max = 0.5; % MPa
 delta_n = 2.5; % mm
-m0 = 0.1672;
+lamda_cr = 0.001;
 
-tau_max = sigma_max_0; % MPa
-beta_k = alpha_k;
-delta_t = delta_n; % mm
-n0 = m0;
-
-ParaPPR = [delta_n, delta_t, m0, n0, alpha_k, beta_k, sigma_max_0, tau_max];
+ParaCZM = [sigma_max, lamda_cr, delta_n];
 %% Material para
 Para.ndim = 2; % dim
 Para.isStress = 2;  % 1 - plane stress, 2 - plane strain
@@ -97,7 +91,7 @@ while t <= tMax
     [BC, uv] = startingValue(un, uS, node, coNodesDown);
 
     % Calculate the cohesive nodal forces and the stiffness matrix
-    [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax);
+    [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaCZM);
 
     % Residual
     Rv = K * uv + Fcv - BC.RHS;
@@ -120,7 +114,7 @@ while t <= tMax
         uv = uv + duv;
 
         % Calculate the cohesive nodal forces and the stiffness matrix
-        [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax);
+        [KCZM, Fcv] = CohesiveMatrix(uv, elemCoh, node, Para, ParaCZM);
 
         % Residual
         Rv = K * uv + Fcv - BC.RHS;
@@ -147,9 +141,6 @@ while t <= tMax
     t = t + delatT;
     [u] = [u, un];
     q = q + 1;
-
-    [~, ~, GaussInfo] = CohesiveMatrix(un, elemCoh, node, Para, ParaPPR, DMax);
-    DMax = renew_DMax(Para, elemCoh, GaussInfo, reshape(un, 2, [])', DMax);
 
     %     if uv(44) >= delta_n-0.03
     %         1;
@@ -214,11 +205,14 @@ BC = setBC(fixNode, nodeForce, size(node, 1) * 2);
 uv(BC.DirchletDOF) = BC.Dirichlet;
 end
 
-function [KCZM, Fcv, GaussInfo] = CohesiveMatrix(uv, elemCoh, node, Para, ParaPPR, DMax)
-
+function [KCZM, Fcv, GaussInfo] = CohesiveMatrix(uv, elemCoh, node, Para, ParaCZM)
+sigma_c = ParaCZM(1);
+lamda_cr = ParaCZM(2);
+delta_c = ParaCZM(3);
 uv = reshape(uv, 2, [])';
 GaussInfo = shapeFunc_valueDeriv_CZM(elemCoh, node, uv, Para);
-[KCZM, Fcv] = globalK2D_CZM_PPR(Para, elemCoh, GaussInfo, uv, 'PPR', ParaPPR, DMax);
+[KCZM, Fcv] = globalK2D_CZM_Bilinear(Para, elemCoh, GaussInfo, uv, 'bilinear', sigma_c, lamda_cr, delta_c);
+% [KCZM, Fcv] = globalK2D_CZM_PPR(Para, elemCoh, GaussInfo, uv, 'PPR', ParaPPR, DMax);
 end
 
 function [Rv, dRduv] = ApplyBC(BC, Rv, dRduv)
